@@ -1,0 +1,36 @@
+{
+  "expo": {
+    "name": "Pitch Cricket",
+    "slug": "pitch-cricket",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "backgroundColor": "#0d3026"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.pitchcricket.app"
+    },
+    "android": {
+      "package": "com.pitchcricket.app",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/app-icon.png",
+        "backgroundColor": "#0d3026"
+      }
+    },
+    "plugins": [
+      "expo-updates"
+    ],
+    "experiments": {
+      "baseUrl": "/testing/scoreboard/dist"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "cc2837ad-ef2f-4452-88e2-1db9a810c56d"
+      }
+    },
+    "owner": "ro_hit_dev2512",
+    "icon": "./assets/app-icon.png"
+  }
+}

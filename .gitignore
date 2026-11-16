@@ -1,0 +1,12 @@
+node_modules/
+.expo/
+.expo-local/
+.npm-cache/
+dist/
+web-build/
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+.chrome-debug-temp/
