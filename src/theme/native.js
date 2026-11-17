@@ -1,7 +1,7 @@
 import React, { useContext } from 'react';
 import {
   ActivityIndicator as NativeActivityIndicator,
-  Alert,
+  Alert as NativeAlert,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -66,4 +66,43 @@ export function StatusBar(props) { const { mode } = useTheme(); return <NativeSt
 export function ActivityIndicator({ color, ...props }) { const { mode } = useTheme(); return <NativeActivityIndicator {...props} color={mode === 'dark' ? darkText[color] || color : color} />; }
 export function LinearGradient({ style, ...props }) { const { mode } = useTheme(); return <NativeLinearGradient {...props} style={themedStyle(style, mode)} />; }
 
-export { Alert, KeyboardAvoidingView, Modal, Platform };
+export const Alert = {
+  alert(title, message, buttons) {
+    if (Platform.OS === 'web') {
+      const text = [title, message].filter(Boolean).join('\n\n');
+      if (!buttons || buttons.length === 0) {
+        if (typeof window !== 'undefined' && window.alert) {
+          window.alert(text);
+        }
+        return;
+      }
+      if (buttons.length === 1) {
+        if (typeof window !== 'undefined' && window.alert) {
+          window.alert(text);
+        }
+        if (typeof buttons[0]?.onPress === 'function') {
+          buttons[0].onPress();
+        }
+        return;
+      }
+      if (typeof window !== 'undefined' && window.confirm) {
+        const confirmed = window.confirm(text);
+        if (confirmed) {
+          const okBtn = buttons.find((b) => b.style !== 'cancel') || buttons[buttons.length - 1];
+          if (typeof okBtn?.onPress === 'function') {
+            okBtn.onPress();
+          }
+        } else {
+          const cancelBtn = buttons.find((b) => b.style === 'cancel');
+          if (typeof cancelBtn?.onPress === 'function') {
+            cancelBtn.onPress();
+          }
+        }
+      }
+    } else {
+      NativeAlert.alert(title, message, buttons);
+    }
+  },
+};
+
+export { KeyboardAvoidingView, Modal, Platform };
