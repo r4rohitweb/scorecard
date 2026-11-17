@@ -359,6 +359,12 @@ function AppContent() {
       shotDirection = event?.shotDirection || null;
     }
 
+    if ((item.batters || []).length === 1 && (batterRuns === 1 || batterRuns === 3)) {
+      setToast('1 & 3 runs disabled for solo batter');
+      setTimeout(() => setToast(''), 2200);
+      return;
+    }
+
     const ballLabel = out
       ? 'W'
       : isWide

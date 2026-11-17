@@ -176,6 +176,10 @@ function updateScore(item, event, undoHistory = []) {
     shotDirection = event?.shotDirection || null;
   }
 
+  if ((item.batters || []).length === 1 && (batterRuns === 1 || batterRuns === 3)) {
+    return { item, undoHistory, error: '1 and 3 runs are disabled when the last batsman plays alone' };
+  }
+
   const ballLabel = out
     ? 'W'
     : isWide
@@ -1080,20 +1084,35 @@ it('TEST 25: Gully Cricket - Last player bats alone when N-1 wickets fall', () =
   assert.strictEqual(m1.batters[0].onStrike, true, 'Batter D must be on strike');
   assert.strictEqual(m1.batters[0].solo, true, 'Batter D should have solo flag set to true');
 
-  // Solo batter scores a single (1 run)
-  const afterSingle = updateScore(m1, 1);
-  const m2 = afterSingle.item;
-  assert.strictEqual(m2.score, 21, 'Score should increase to 21');
-  assert.strictEqual(m2.batters.length, 1, 'Still 1 batter');
-  assert.strictEqual(m2.batters[0].onStrike, true, 'Strike should remain on solo batter on odd runs');
-  assert.strictEqual(m2.batters[0].runs, 3, 'Batter D runs updated');
+  // Attempting 1 run when solo batter plays -> MUST BE DISABLED / REJECTED
+  const trySingle = updateScore(m1, 1);
+  assert.strictEqual(trySingle.error, '1 and 3 runs are disabled when the last batsman plays alone');
+  assert.strictEqual(trySingle.item.score, 20, 'Score should not change on disabled single');
 
-  // Next delivery completes the over (Ball 6) with 2 runs
+  // Attempting 3 runs when solo batter plays -> MUST BE DISABLED / REJECTED
+  const tryThree = updateScore(m1, 3);
+  assert.strictEqual(tryThree.error, '1 and 3 runs are disabled when the last batsman plays alone');
+  assert.strictEqual(tryThree.item.score, 20, 'Score should not change on disabled 3 runs');
+
+  // Solo batter scores 2 runs (running double and returning) -> ALLOWED
+  const afterDouble = updateScore(m1, 2);
+  const m2 = afterDouble.item;
+  assert.strictEqual(m2.score, 22, 'Score should increase to 22');
+  assert.strictEqual(m2.batters.length, 1, 'Still 1 batter');
+  assert.strictEqual(m2.batters[0].onStrike, true, 'Strike should remain on solo batter');
+  assert.strictEqual(m2.batters[0].runs, 4, 'Batter D runs updated from 2 to 4');
+
+  // Next delivery completes the over (Ball 6) with 4 runs boundary
   m2.overs = '1.5';
-  const afterOver = updateScore(m2, 2);
+  const afterOver = updateScore(m2, 4);
   const m3 = afterOver.item;
   assert.strictEqual(m3.overs, '2.0', 'Over completes');
+  assert.strictEqual(m3.score, 26, 'Score is 26');
   assert.strictEqual(m3.batters[0].onStrike, true, 'Strike should remain on solo batter across overs');
+
+  // Wide delivery (+1 extra, 0 batter runs) works normally for solo batter
+  const afterWide = updateScore(m3, 'Wide');
+  assert.strictEqual(afterWide.item.score, 27, 'Wide adds 1 extra run without error');
 });
 
 it('TEST 26: Gully Cricket - Team is all-out only when all N wickets fall with lastManBats: true', () => {

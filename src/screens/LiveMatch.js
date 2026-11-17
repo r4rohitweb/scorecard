@@ -325,16 +325,19 @@ function NoBallModal({ visible, match, onClose, onConfirm }) {
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 16 }}>
               {[
                 { r: 0, label: '0 (Dot / No run)' },
-                { r: 1, label: '1 Run' },
+                { r: 1, label: match.batters?.length === 1 ? '1 (Disabled)' : '1 Run' },
                 { r: 2, label: '2 Runs' },
-                { r: 3, label: '3 Runs' },
+                { r: 3, label: match.batters?.length === 1 ? '3 (Disabled)' : '3 Runs' },
                 { r: 4, label: '4 (Four)' },
                 { r: 6, label: '6 (Six)' },
               ].map((opt) => {
+                const isSolo = match.batters?.length === 1;
+                const disabled = isSolo && (opt.r === 1 || opt.r === 3);
                 const active = batRuns === opt.r;
                 return (
                   <Pressable
                     key={opt.r}
+                    disabled={disabled}
                     onPress={() => setBatRuns(opt.r)}
                     style={{
                       flexBasis: '31%',
@@ -342,12 +345,20 @@ function NoBallModal({ visible, match, onClose, onConfirm }) {
                       paddingVertical: 12,
                       alignItems: 'center',
                       borderRadius: 13,
-                      backgroundColor: active ? '#187B62' : 'white',
+                      backgroundColor: disabled ? '#F3F5F4' : active ? '#187B62' : 'white',
                       borderWidth: 1,
-                      borderColor: active ? '#187B62' : '#E7ECE7',
+                      borderColor: disabled ? '#E2E6E3' : active ? '#187B62' : '#E7ECE7',
+                      opacity: disabled ? 0.35 : 1,
                     }}
                   >
-                    <Text style={{ color: active ? 'white' : '#253129', fontSize: 12, fontWeight: '800' }}>
+                    <Text
+                      style={{
+                        color: disabled ? '#8E9B92' : active ? 'white' : '#253129',
+                        fontSize: 12,
+                        fontWeight: '800',
+                        textDecorationLine: disabled ? 'line-through' : 'none',
+                      }}
+                    >
                       {opt.label}
                     </Text>
                   </Pressable>
@@ -923,7 +934,7 @@ export default function LiveMatch({ match, onBack, onUpdate, onSelectBatter, onS
               </View>
             </View>
             <Text style={{ color: '#B45309', fontSize: 11, marginTop: 2 }}>
-              {match.batters[0]?.name} is batting alone. Strike does not rotate. Innings ends on this wicket!
+              {match.batters[0]?.name} is batting alone. 1 & 3 runs disabled (no running partner). Innings ends on this wicket!
             </Text>
           </View>
         </View>
@@ -990,7 +1001,63 @@ export default function LiveMatch({ match, onBack, onUpdate, onSelectBatter, onS
     {match.inningsNumber === 2 && match.firstInnings && <View style={{ marginTop: 18, borderRadius: 15, padding: 13, backgroundColor: '#EAF3ED' }}><Text style={{ color: '#187B62', fontSize: 9, fontWeight: '800' }}>FIRST INNINGS</Text><Text style={{ color: '#253129', fontSize: 12, fontWeight: '700', marginTop: 5 }}>{match.firstInnings.team}  -  {match.firstInnings.score}/{match.firstInnings.wickets} ({match.firstInnings.overs} ov)</Text>{(match.status === 'AWAITING_END' || match.status === 'COMPLETED') && <Text style={{ color: '#187B62', fontSize: 11, fontWeight: '800', marginTop: 6 }}>{match.result}</Text>}</View>}
     {match.status === 'INNINGS_BREAK' && <View style={{ marginTop: 19, borderRadius: 17, backgroundColor: '#EAF3ED', padding: 15 }}><Text style={{ color: '#187B62', fontSize: 10, fontWeight: '800' }}>FIRST INNINGS COMPLETE</Text><Text style={{ color: '#253129', fontSize: 13, fontWeight: '700', marginTop: 5 }}>{match.home.name} made {match.score}/{match.wickets} in {match.overs} overs.</Text><Text style={{ color: '#536057', fontSize: 11, marginTop: 4 }}>Target for {match.away.name}: {match.target} runs</Text><Pressable onPress={() => setShowSecondInningsSetup(true)} style={{ marginTop: 12, minHeight: 43, borderRadius: 13, backgroundColor: '#187B62', alignItems: 'center', justifyContent: 'center' }}><Text style={{ color: 'white', fontSize: 11, fontWeight: '800' }}>Choose second innings line-up</Text></Pressable></View>}
     </View>
-  </ScrollView><View style={{ backgroundColor: '#FFFFFF', paddingHorizontal: 18, paddingTop: 10, paddingBottom: 12, borderTopWidth: 1, borderTopColor: '#E8ECE8' }}>{match.status === 'LIVE' ? <><View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}><Text style={{ color: '#17221D', fontWeight: '800', fontSize: 16 }}>Scoring controls</Text><View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>{match.batters.length > 1 && (<Pressable onPress={() => onUpdate('swapStrike')} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}><Ionicons name="swap-horizontal" size={14} color="#187B62" /><Text style={{ color: '#187B62', fontSize: 11, fontWeight: '700' }}>Rotate strike</Text></Pressable>)}<Pressable onPress={() => onUpdate('undo')} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}><Ionicons name="arrow-undo" size={14} color="#187B62" /><Text style={{ color: '#187B62', fontSize: 11, fontWeight: '700' }}>Undo</Text></Pressable></View></View><View style={{ flexDirection: 'row', gap: 8, marginTop: 10 }}>{[0, 1, 2, 3, 4, 6].map((runs) => <Pressable onPress={() => { if (runs === 4 || runs === 6) { setShotPrompt({ runs }); } else { onUpdate(runs); } }} key={runs} style={{ flex: 1, height: 42, borderRadius: 13, backgroundColor: runs === 4 || runs === 6 ? '#187B62' : 'white', borderWidth: runs === 4 || runs === 6 ? 0 : 1, borderColor: '#E6EBE7', alignItems: 'center', justifyContent: 'center' }}><Text style={{ color: runs === 4 || runs === 6 ? 'white' : '#253129', fontSize: 15, fontWeight: '800' }}>{runs}</Text></Pressable>)}</View><View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
+  </ScrollView><View style={{ backgroundColor: '#FFFFFF', paddingHorizontal: 18, paddingTop: 10, paddingBottom: 12, borderTopWidth: 1, borderTopColor: '#E8ECE8' }}>{match.status === 'LIVE' ? <><View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}><Text style={{ color: '#17221D', fontWeight: '800', fontSize: 16 }}>Scoring controls</Text><View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>{match.batters.length > 1 && (<Pressable onPress={() => onUpdate('swapStrike')} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}><Ionicons name="swap-horizontal" size={14} color="#187B62" /><Text style={{ color: '#187B62', fontSize: 11, fontWeight: '700' }}>Rotate strike</Text></Pressable>)}<Pressable onPress={() => onUpdate('undo')} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}><Ionicons name="arrow-undo" size={14} color="#187B62" /><Text style={{ color: '#187B62', fontSize: 11, fontWeight: '700' }}>Undo</Text></Pressable></View></View>      <View style={{ flexDirection: 'row', gap: 8, marginTop: 10 }}>
+        {[0, 1, 2, 3, 4, 6].map((runs) => {
+          const isSolo = match.batters?.length === 1;
+          const disabled = isSolo && (runs === 1 || runs === 3);
+          return (
+            <Pressable
+              key={runs}
+              disabled={disabled}
+              onPress={() => {
+                if (runs === 4 || runs === 6) {
+                  setShotPrompt({ runs });
+                } else {
+                  onUpdate(runs);
+                }
+              }}
+              style={{
+                flex: 1,
+                height: 42,
+                borderRadius: 13,
+                backgroundColor: disabled
+                  ? '#F2F4F2'
+                  : runs === 4 || runs === 6
+                  ? '#187B62'
+                  : 'white',
+                borderWidth: disabled ? 1 : runs === 4 || runs === 6 ? 0 : 1,
+                borderColor: disabled ? '#E2E6E3' : '#E6EBE7',
+                alignItems: 'center',
+                justifyContent: 'center',
+                opacity: disabled ? 0.35 : 1,
+              }}
+            >
+              <Text
+                style={{
+                  color: disabled
+                    ? '#8E9B92'
+                    : runs === 4 || runs === 6
+                    ? 'white'
+                    : '#253129',
+                  fontSize: 15,
+                  fontWeight: '800',
+                  textDecorationLine: disabled ? 'line-through' : 'none',
+                }}
+              >
+                {runs}
+              </Text>
+            </Pressable>
+          );
+        })}
+      </View>
+      {match.batters?.length === 1 && (
+        <View style={{ marginTop: 6, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
+          <Ionicons name="information-circle-outline" size={13} color="#92400E" />
+          <Text style={{ color: '#92400E', fontSize: 10, fontWeight: '700' }}>
+            1 & 3 runs disabled for solo batter
+          </Text>
+        </View>
+      )}<View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
   {[
     { label: 'Wicket', bg: '#FCECE8', border: '#F4D2C9', text: '#C6533C' },
     { label: 'Wide', bg: '#F2F5F2', border: '#E4ECE5', text: '#3E4E44' },
