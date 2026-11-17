@@ -834,8 +834,27 @@ export default function LiveMatch({ match, onBack, onUpdate, onSelectBatter, onS
     <View style={{ paddingHorizontal: 20, paddingTop: 20 }}>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 13 }}>
         <Text style={{ color: '#17221D', fontWeight: '800', fontSize: 17 }}>Batting</Text>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
           <Text style={{ color: '#87928A', fontSize: 10 }}>{match.inningsNumber === 2 ? '2ND INNINGS' : '1ST INNINGS'}</Text>
+          <Pressable
+            onPress={() => onUpdate({ type: 'setLastManBats', value: !match.lastManBats })}
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 3,
+              backgroundColor: match.lastManBats ? '#EBF3FF' : '#F3F5F4',
+              paddingHorizontal: 7,
+              paddingVertical: 4,
+              borderRadius: 8,
+              borderWidth: 1,
+              borderColor: match.lastManBats ? '#BDD8FA' : '#E2E8E4',
+            }}
+          >
+            <Ionicons name="person" size={11} color={match.lastManBats ? '#1E60BF' : '#738278'} />
+            <Text style={{ color: match.lastManBats ? '#1E60BF' : '#738278', fontSize: 10, fontWeight: '700' }}>
+              {match.lastManBats ? 'Last Man: ON' : 'Last Man: OFF'}
+            </Text>
+          </Pressable>
           <Pressable
             onPress={() => setShowRetireModal(true)}
             style={{
@@ -853,29 +872,63 @@ export default function LiveMatch({ match, onBack, onUpdate, onSelectBatter, onS
             <Ionicons name="body-outline" size={11} color="#526057" />
             <Text style={{ color: '#526057', fontSize: 10, fontWeight: '700' }}>Retire</Text>
           </Pressable>
-          <Pressable
-            onPress={() => onUpdate('swapStrike')}
-            style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              gap: 4,
-              backgroundColor: '#E8F5EF',
-              paddingHorizontal: 8,
-              paddingVertical: 4,
-              borderRadius: 8,
-              borderWidth: 1,
-              borderColor: '#BFE4D3',
-            }}
-          >
-            <Ionicons name="swap-horizontal" size={12} color="#187B62" />
-            <Text style={{ color: '#187B62', fontSize: 10, fontWeight: '700' }}>Rotate strike</Text>
-          </Pressable>
+          {match.batters.length > 1 && (
+            <Pressable
+              onPress={() => onUpdate('swapStrike')}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 4,
+                backgroundColor: '#E8F5EF',
+                paddingHorizontal: 8,
+                paddingVertical: 4,
+                borderRadius: 8,
+                borderWidth: 1,
+                borderColor: '#BFE4D3',
+              }}
+            >
+              <Ionicons name="swap-horizontal" size={12} color="#187B62" />
+              <Text style={{ color: '#187B62', fontSize: 10, fontWeight: '700' }}>Rotate strike</Text>
+            </Pressable>
+          )}
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
             <StrikerIndicator size={12} />
             <Text style={{ color: '#187B62', fontSize: 10, fontWeight: '800' }}>On strike</Text>
           </View>
         </View>
-      </View><View style={{ backgroundColor: 'white', borderRadius: 16, borderWidth: 1, borderColor: '#EDF0ED', overflow: 'hidden' }}><View style={{ flexDirection: 'row', padding: 12, backgroundColor: '#F4F7F4' }}><Text style={{ flex: 1.6, color: '#78857C', fontSize: 9, fontWeight: '700' }}>BATTER</Text>{['R', 'B', '4s', '6s', 'SR'].map((v) => <Text key={v} style={{ width: 34, textAlign: 'right', color: '#78857C', fontSize: 9, fontWeight: '700' }}>{v}</Text>)}</View>{match.batters.map((batter) => {
+      </View>
+      {match.batters.length === 1 && (
+        <View
+          style={{
+            backgroundColor: '#FEF3C7',
+            borderWidth: 1,
+            borderColor: '#FCD34D',
+            borderRadius: 14,
+            paddingHorizontal: 12,
+            paddingVertical: 10,
+            marginBottom: 10,
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 10,
+          }}
+        >
+          <Text style={{ fontSize: 20 }}>🏏</Text>
+          <View style={{ flex: 1 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Text style={{ color: '#92400E', fontSize: 12, fontWeight: '800' }}>
+                LAST MAN STANDING (Solo Batter)
+              </Text>
+              <View style={{ backgroundColor: '#D97706', paddingHorizontal: 5, paddingVertical: 1, borderRadius: 4 }}>
+                <Text style={{ color: 'white', fontSize: 8, fontWeight: '800' }}>GULLY RULE</Text>
+              </View>
+            </View>
+            <Text style={{ color: '#B45309', fontSize: 11, marginTop: 2 }}>
+              {match.batters[0]?.name} is batting alone. Strike does not rotate. Innings ends on this wicket!
+            </Text>
+          </View>
+        </View>
+      )}
+      <View style={{ backgroundColor: 'white', borderRadius: 16, borderWidth: 1, borderColor: '#EDF0ED', overflow: 'hidden' }}><View style={{ flexDirection: 'row', padding: 12, backgroundColor: '#F4F7F4' }}><Text style={{ flex: 1.6, color: '#78857C', fontSize: 9, fontWeight: '700' }}>BATTER</Text>{['R', 'B', '4s', '6s', 'SR'].map((v) => <Text key={v} style={{ width: 34, textAlign: 'right', color: '#78857C', fontSize: 9, fontWeight: '700' }}>{v}</Text>)}</View>{match.batters.map((batter) => {
       const cardEntry = match.battingCard?.find((b) => b.name === batter.name);
       const fours = cardEntry?.fours ?? batter.fours ?? 0;
       const sixes = cardEntry?.sixes ?? batter.sixes ?? 0;
@@ -884,6 +937,11 @@ export default function LiveMatch({ match, onBack, onUpdate, onSelectBatter, onS
         <View style={{ flex: 1.6, flexDirection: 'row', alignItems: 'center' }}>
           {batter.onStrike && <StrikerIndicator size={13} />}
           <Text numberOfLines={1} style={{ flex: 1, color: '#253129', fontSize: 11, fontWeight: batter.onStrike ? '800' : '600' }}>{batter.name}</Text>
+          {(batter.solo || match.batters.length === 1) && (
+            <View style={{ backgroundColor: '#FEF3C7', paddingHorizontal: 5, paddingVertical: 1, borderRadius: 5, marginLeft: 4 }}>
+              <Text style={{ color: '#B45309', fontSize: 8, fontWeight: '800' }}>SOLO</Text>
+            </View>
+          )}
           {batter.runs >= 100 ? (
             <View style={{ backgroundColor: '#FEF3C7', paddingHorizontal: 5, paddingVertical: 1, borderRadius: 5, marginLeft: 4 }}>
               <Text style={{ color: '#B45309', fontSize: 8, fontWeight: '800' }}>👑 100</Text>
@@ -932,7 +990,7 @@ export default function LiveMatch({ match, onBack, onUpdate, onSelectBatter, onS
     {match.inningsNumber === 2 && match.firstInnings && <View style={{ marginTop: 18, borderRadius: 15, padding: 13, backgroundColor: '#EAF3ED' }}><Text style={{ color: '#187B62', fontSize: 9, fontWeight: '800' }}>FIRST INNINGS</Text><Text style={{ color: '#253129', fontSize: 12, fontWeight: '700', marginTop: 5 }}>{match.firstInnings.team}  -  {match.firstInnings.score}/{match.firstInnings.wickets} ({match.firstInnings.overs} ov)</Text>{(match.status === 'AWAITING_END' || match.status === 'COMPLETED') && <Text style={{ color: '#187B62', fontSize: 11, fontWeight: '800', marginTop: 6 }}>{match.result}</Text>}</View>}
     {match.status === 'INNINGS_BREAK' && <View style={{ marginTop: 19, borderRadius: 17, backgroundColor: '#EAF3ED', padding: 15 }}><Text style={{ color: '#187B62', fontSize: 10, fontWeight: '800' }}>FIRST INNINGS COMPLETE</Text><Text style={{ color: '#253129', fontSize: 13, fontWeight: '700', marginTop: 5 }}>{match.home.name} made {match.score}/{match.wickets} in {match.overs} overs.</Text><Text style={{ color: '#536057', fontSize: 11, marginTop: 4 }}>Target for {match.away.name}: {match.target} runs</Text><Pressable onPress={() => setShowSecondInningsSetup(true)} style={{ marginTop: 12, minHeight: 43, borderRadius: 13, backgroundColor: '#187B62', alignItems: 'center', justifyContent: 'center' }}><Text style={{ color: 'white', fontSize: 11, fontWeight: '800' }}>Choose second innings line-up</Text></Pressable></View>}
     </View>
-  </ScrollView><View style={{ backgroundColor: '#FFFFFF', paddingHorizontal: 18, paddingTop: 10, paddingBottom: 12, borderTopWidth: 1, borderTopColor: '#E8ECE8' }}>{match.status === 'LIVE' ? <><View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}><Text style={{ color: '#17221D', fontWeight: '800', fontSize: 16 }}>Scoring controls</Text><View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}><Pressable onPress={() => onUpdate('swapStrike')} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}><Ionicons name="swap-horizontal" size={14} color="#187B62" /><Text style={{ color: '#187B62', fontSize: 11, fontWeight: '700' }}>Rotate strike</Text></Pressable><Pressable onPress={() => onUpdate('undo')} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}><Ionicons name="arrow-undo" size={14} color="#187B62" /><Text style={{ color: '#187B62', fontSize: 11, fontWeight: '700' }}>Undo</Text></Pressable></View></View><View style={{ flexDirection: 'row', gap: 8, marginTop: 10 }}>{[0, 1, 2, 3, 4, 6].map((runs) => <Pressable onPress={() => { if (runs === 4 || runs === 6) { setShotPrompt({ runs }); } else { onUpdate(runs); } }} key={runs} style={{ flex: 1, height: 42, borderRadius: 13, backgroundColor: runs === 4 || runs === 6 ? '#187B62' : 'white', borderWidth: runs === 4 || runs === 6 ? 0 : 1, borderColor: '#E6EBE7', alignItems: 'center', justifyContent: 'center' }}><Text style={{ color: runs === 4 || runs === 6 ? 'white' : '#253129', fontSize: 15, fontWeight: '800' }}>{runs}</Text></Pressable>)}</View><View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
+  </ScrollView><View style={{ backgroundColor: '#FFFFFF', paddingHorizontal: 18, paddingTop: 10, paddingBottom: 12, borderTopWidth: 1, borderTopColor: '#E8ECE8' }}>{match.status === 'LIVE' ? <><View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}><Text style={{ color: '#17221D', fontWeight: '800', fontSize: 16 }}>Scoring controls</Text><View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>{match.batters.length > 1 && (<Pressable onPress={() => onUpdate('swapStrike')} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}><Ionicons name="swap-horizontal" size={14} color="#187B62" /><Text style={{ color: '#187B62', fontSize: 11, fontWeight: '700' }}>Rotate strike</Text></Pressable>)}<Pressable onPress={() => onUpdate('undo')} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}><Ionicons name="arrow-undo" size={14} color="#187B62" /><Text style={{ color: '#187B62', fontSize: 11, fontWeight: '700' }}>Undo</Text></Pressable></View></View><View style={{ flexDirection: 'row', gap: 8, marginTop: 10 }}>{[0, 1, 2, 3, 4, 6].map((runs) => <Pressable onPress={() => { if (runs === 4 || runs === 6) { setShotPrompt({ runs }); } else { onUpdate(runs); } }} key={runs} style={{ flex: 1, height: 42, borderRadius: 13, backgroundColor: runs === 4 || runs === 6 ? '#187B62' : 'white', borderWidth: runs === 4 || runs === 6 ? 0 : 1, borderColor: '#E6EBE7', alignItems: 'center', justifyContent: 'center' }}><Text style={{ color: runs === 4 || runs === 6 ? 'white' : '#253129', fontSize: 15, fontWeight: '800' }}>{runs}</Text></Pressable>)}</View><View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
   {[
     { label: 'Wicket', bg: '#FCECE8', border: '#F4D2C9', text: '#C6533C' },
     { label: 'Wide', bg: '#F2F5F2', border: '#E4ECE5', text: '#3E4E44' },

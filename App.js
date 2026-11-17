@@ -172,6 +172,14 @@ function AppContent() {
       setTimeout(() => setToast(''), 2000);
       return;
     }
+    if (typeof event === 'object' && event?.type === 'setLastManBats') {
+      const next = { ...item, lastManBats: Boolean(event.value) };
+      setSelectedMatch(next);
+      setScoreMatches((all) => all.map((entry) => entry.id === item.id ? next : entry));
+      setToast(`Gully rule: Last player bats alone is ${event.value ? 'ON' : 'OFF'}`);
+      setTimeout(() => setToast(''), 2000);
+      return;
+    }
     if (typeof event === 'object' && event?.type === 'Retire') {
       const reason = event.reason || 'retired hurt';
       const isOut = reason === 'retired out';
@@ -225,13 +233,26 @@ function AppContent() {
         pendingBatterOnStrike = wasOnStrike;
       }
 
+      const lastManBats = Boolean(item.lastManBats);
       const finalWickets = item.wickets + (isOut ? 1 : 0);
       const squadCount = item.battingPlayers?.length || (item.batters?.length ? item.batters.length + 1 : 11);
-      const allOut = Boolean(isOut && finalWickets >= squadCount - 1);
+      const maxWickets = lastManBats ? squadCount : Math.max(1, squadCount - 1);
+      const allOut = Boolean(isOut && finalWickets >= maxWickets);
       const inningComplete = allOut;
       const inningsBreak = Boolean(inningComplete && (item.inningsNumber || 1) === 1);
       const targetReached = Boolean((item.inningsNumber || 1) === 2 && item.target && item.score >= item.target);
       const matchComplete = Boolean((item.inningsNumber || 1) === 2 && (targetReached || inningComplete));
+
+      const isSoloLastMan = Boolean(isOut && !allOut && lastManBats && !subBatterName && finalWickets === squadCount - 1);
+      if (isSoloLastMan) {
+        const partner = batters.find((_, idx) => idx !== retireIdx);
+        if (partner) {
+          batters = [{ ...partner, onStrike: true, solo: true }];
+          pendingBatterSelection = false;
+          pendingBatterIndex = null;
+          pendingBatterOnStrike = null;
+        }
+      }
 
       const overHistory = [...(item.overHistory || [])];
       if (overHistory.length > 0) {
@@ -264,7 +285,7 @@ function AppContent() {
         ? 'First innings complete'
         : matchComplete
         ? targetReached
-          ? `${item.home.name} won by ${Math.max(1, squadCount - finalWickets - 1)} wickets`
+          ? `${item.home.name} won by ${Math.max(1, maxWickets - finalWickets)} wickets`
           : `${item.away.name} won by ${Math.max(0, item.target - 1 - item.score)} runs`
         : item.result;
 
@@ -539,29 +560,40 @@ function AppContent() {
     const nextBatterIndex = item.nextBatterIndex ?? 2;
     const availableBatters = (item.battingPlayers || []).filter((name) => !(item.dismissedPlayers || []).includes(name) && !item.batters.some((batter) => batter.name === name));
     const nextBatterName = availableBatters?.[0];
+    const lastManBats = Boolean(item.lastManBats);
     const squadCount = item.battingPlayers?.length || (item.batters?.length ? item.batters.length + 1 : 11);
-    const allOut = Boolean(out && (item.wickets + 1 >= squadCount - 1));
+    const maxWickets = lastManBats ? squadCount : Math.max(1, squadCount - 1);
+    const finalWickets = item.wickets + (out ? 1 : 0);
+    const allOut = Boolean(out && (finalWickets >= maxWickets));
     const oversComplete = Boolean(item.totalOvers && totalBalls >= item.totalOvers * 6);
     const inningComplete = oversComplete || allOut;
     const inningsBreak = Boolean(inningComplete && (item.inningsNumber || 1) === 1);
     const targetReached = Boolean((item.inningsNumber || 1) === 2 && item.target && item.score + runs >= item.target);
     const matchComplete = Boolean((item.inningsNumber || 1) === 2 && (targetReached || inningComplete));
     const completed = inningsBreak || matchComplete;
+
+    const isSoloLastMan = Boolean(out && !completed && lastManBats && !nextBatterName && finalWickets < maxWickets);
+    if (isSoloLastMan) {
+      const partner = batters.find((_, idx) => idx !== dismissedIndex);
+      if (partner) {
+        batters = [{ ...partner, onStrike: true, solo: true }];
+      }
+    }
+
     const pendingBatterSelection = Boolean(out && nextBatterName && !completed);
     const pendingBowlerSelection = Boolean(overComplete && (item.bowlingPlayers?.length || 0) > 1 && !completed);
     const finalScore = item.score + runs;
-    const finalWickets = item.wickets + (out ? 1 : 0);
     const result = inningsBreak
       ? 'First innings complete'
       : matchComplete
       ? targetReached
-        ? `${item.home.name} won by ${Math.max(1, squadCount - finalWickets - 1)} wickets`
+        ? `${item.home.name} won by ${Math.max(1, maxWickets - finalWickets)} wickets`
         : finalScore === item.target - 1
         ? 'Match tied'
         : `${item.away.name} won by ${Math.max(0, item.target - 1 - finalScore)} runs`
       : item.result;
     const firstInnings = inningsBreak ? { team: item.home.name, score: finalScore, wickets: finalWickets, overs: overText, totalOvers: item.totalOvers, batters, battingCard, overHistory, bowlingStats, bowler: { ...item.bowler } } : item.firstInnings;
-    let next = { ...item, status: inningsBreak ? 'INNINGS_BREAK' : matchComplete ? 'AWAITING_END' : item.status, result, target: inningsBreak ? finalScore + 1 : item.target, firstInnings, score: finalScore, wickets: finalWickets, overs: overText, lastBalls: [...(item.lastBalls || []), ballLabel].slice(-6), overHistory, batters, battingCard, nextBatterIndex, dismissedPlayers: out ? [...(item.dismissedPlayers || []), dismissedName] : item.dismissedPlayers || [], pendingBatterSelection, pendingBatterIndex: pendingBatterSelection ? dismissedIndex : null, pendingBatterOnStrike: pendingBatterSelection ? (overComplete ? (dismissedIndex !== strikerIndex) : (dismissedIndex === strikerIndex)) : null, pendingBowlerSelection, bowlingStats, bowler: { name: nextBowlerName, runs: bowlerStats.runs, wickets: bowlerStats.wickets, legalBalls: bowlerStats.legalBalls, overs: `${Math.floor(bowlerStats.legalBalls / 6)}.${bowlerStats.legalBalls % 6}` }, noBallRun: noBallPenalty };
+    let next = { ...item, status: inningsBreak ? 'INNINGS_BREAK' : matchComplete ? 'AWAITING_END' : item.status, result, target: inningsBreak ? finalScore + 1 : item.target, firstInnings, score: finalScore, wickets: finalWickets, overs: overText, lastBalls: [...(item.lastBalls || []), ballLabel].slice(-6), overHistory, batters, battingCard, nextBatterIndex, dismissedPlayers: out ? [...(item.dismissedPlayers || []), dismissedName] : item.dismissedPlayers || [], pendingBatterSelection, pendingBatterIndex: pendingBatterSelection ? dismissedIndex : null, pendingBatterOnStrike: pendingBatterSelection ? (overComplete ? (dismissedIndex !== strikerIndex) : (dismissedIndex === strikerIndex)) : null, pendingBowlerSelection, bowlingStats, bowler: { name: nextBowlerName, runs: bowlerStats.runs, wickets: bowlerStats.wickets, legalBalls: bowlerStats.legalBalls, overs: `${Math.floor(bowlerStats.legalBalls / 6)}.${bowlerStats.legalBalls % 6}` }, noBallRun: noBallPenalty, lastManBats };
     if (matchComplete) {
       const potmCalc = calculatePlayerOfMatch(next);
       if (potmCalc?.bestPlayer) {
@@ -571,14 +603,19 @@ function AppContent() {
       }
     }
     if (out) {
-      setToast(`Wicket! ${dismissedName} ${howOut}`);
-      setTimeout(() => setToast(''), 2200);
+      if (isSoloLastMan) {
+        const partnerName = batters[0]?.name || 'Last player';
+        setToast(`Wicket! ${dismissedName} ${howOut}. ${partnerName} plays alone (Last Man)!`);
+      } else {
+        setToast(`Wicket! ${dismissedName} ${howOut}`);
+      }
+      setTimeout(() => setToast(''), 2500);
     }
     setUndoHistory((history) => [...history, item]);
     setSelectedMatch(next);
     setScoreMatches((all) => all.map((entry) => entry.id === item.id ? next : entry));
   };
-  const startMatch = ({ team1Name, team2Name, overs, battingFirst, players1, players2, striker, nonStriker, bowler, noBallRun = 0 }) => {
+  const startMatch = ({ team1Name, team2Name, overs, battingFirst, players1, players2, striker, nonStriker, bowler, noBallRun = 0, lastManBats = true }) => {
     const suffix = Date.now();
     const team1 = { id: `custom-${suffix}-1`, name: team1Name, short: team1Name.slice(0, 2).toUpperCase(), color: '#187B62' };
     const team2 = { id: `custom-${suffix}-2`, name: team2Name, short: team2Name.slice(0, 2).toUpperCase(), color: '#C66A3F' };
@@ -586,7 +623,7 @@ function AppContent() {
     const bowlingTeam = battingFirst === 1 ? team2 : team1;
     const battingPlayers = battingFirst === 1 ? players1 : players2;
     const bowlingPlayers = battingFirst === 1 ? players2 : players1;
-    const newMatch = { id: `match-${suffix}`, name: `${team1Name} vs ${team2Name}`, status: 'LIVE', inningsNumber: 1, format: `T${overs}`, venue: 'Friendly match', home: battingTeam, away: bowlingTeam, innings: `${battingTeam.name} 1st innings`, score: 0, wickets: 0, overs: '0.0', totalOvers: overs, target: null, batters: [{ name: striker, runs: 0, balls: 0, fours: 0, sixes: 0, onStrike: true }, { name: nonStriker, runs: 0, balls: 0, fours: 0, sixes: 0, onStrike: false }], battingCard: [{ name: striker, runs: 0, balls: 0, fours: 0, sixes: 0, dismissed: false }, { name: nonStriker, runs: 0, balls: 0, fours: 0, sixes: 0, dismissed: false }], battingPlayers, bowlingPlayers, nextBatterIndex: 2, dismissedPlayers: [], pendingBatterSelection: false, pendingBowlerSelection: false, bowler: { name: bowler, overs: '0.0', runs: 0, wickets: 0, legalBalls: 0 }, bowlingStats: {}, lastBalls: [], overHistory: [], noBallRun };
+    const newMatch = { id: `match-${suffix}`, name: `${team1Name} vs ${team2Name}`, status: 'LIVE', inningsNumber: 1, format: `T${overs}`, venue: 'Friendly match', home: battingTeam, away: bowlingTeam, innings: `${battingTeam.name} 1st innings`, score: 0, wickets: 0, overs: '0.0', totalOvers: overs, target: null, batters: [{ name: striker, runs: 0, balls: 0, fours: 0, sixes: 0, onStrike: true }, { name: nonStriker, runs: 0, balls: 0, fours: 0, sixes: 0, onStrike: false }], battingCard: [{ name: striker, runs: 0, balls: 0, fours: 0, sixes: 0, dismissed: false }, { name: nonStriker, runs: 0, balls: 0, fours: 0, sixes: 0, dismissed: false }], battingPlayers, bowlingPlayers, nextBatterIndex: 2, dismissedPlayers: [], pendingBatterSelection: false, pendingBowlerSelection: false, bowler: { name: bowler, overs: '0.0', runs: 0, wickets: 0, legalBalls: 0 }, bowlingStats: {}, lastBalls: [], overHistory: [], noBallRun, lastManBats: Boolean(lastManBats) };
     setScoreMatches((all) => [newMatch, ...all]);
     setUndoHistory([]);
     setCreateVisible(false);
@@ -624,7 +661,7 @@ function AppContent() {
       setTimeout(() => setToast(''), 2200);
       return;
     }
-    const next = { ...item, status: 'LIVE', inningsNumber: 2, innings: `${item.away.name} 2nd innings`, home: item.away, away: item.home, battingPlayers, bowlingPlayers, score: 0, wickets: 0, overs: '0.0', target: item.firstInnings.score + 1, result: null, batters: [{ name: striker, runs: 0, balls: 0, fours: 0, sixes: 0, onStrike: true }, { name: nonStriker, runs: 0, balls: 0, fours: 0, sixes: 0, onStrike: false }], battingCard: [{ name: striker, runs: 0, balls: 0, fours: 0, sixes: 0, dismissed: false }, { name: nonStriker, runs: 0, balls: 0, fours: 0, sixes: 0, dismissed: false }], nextBatterIndex: 2, dismissedPlayers: [], pendingBatterSelection: false, pendingBowlerSelection: false, pendingBatterIndex: null, pendingBatterOnStrike: null, bowler: { name: bowler, overs: '0.0', runs: 0, wickets: 0, legalBalls: 0 }, bowlingStats: {}, lastBalls: [], overHistory: [] };
+    const next = { ...item, status: 'LIVE', inningsNumber: 2, innings: `${item.away.name} 2nd innings`, home: item.away, away: item.home, battingPlayers, bowlingPlayers, score: 0, wickets: 0, overs: '0.0', target: item.firstInnings.score + 1, result: null, batters: [{ name: striker, runs: 0, balls: 0, fours: 0, sixes: 0, onStrike: true }, { name: nonStriker, runs: 0, balls: 0, fours: 0, sixes: 0, onStrike: false }], battingCard: [{ name: striker, runs: 0, balls: 0, fours: 0, sixes: 0, dismissed: false }, { name: nonStriker, runs: 0, balls: 0, fours: 0, sixes: 0, dismissed: false }], nextBatterIndex: 2, dismissedPlayers: [], pendingBatterSelection: false, pendingBowlerSelection: false, pendingBatterIndex: null, pendingBatterOnStrike: null, bowler: { name: bowler, overs: '0.0', runs: 0, wickets: 0, legalBalls: 0 }, bowlingStats: {}, lastBalls: [], overHistory: [], lastManBats: item.lastManBats !== undefined ? item.lastManBats : true };
     setUndoHistory([]);
     setSelectedMatch(next);
     setScoreMatches((all) => all.map((entry) => entry.id === item.id ? next : entry));

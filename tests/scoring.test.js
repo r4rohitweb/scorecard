@@ -20,6 +20,10 @@ function updateScore(item, event, undoHistory = []) {
     const next = { ...item, noBallRun: event.value };
     return { item: next, undoHistory };
   }
+  if (typeof event === 'object' && event?.type === 'setLastManBats') {
+    const next = { ...item, lastManBats: Boolean(event.value) };
+    return { item: next, undoHistory };
+  }
   if (typeof event === 'object' && event?.type === 'Retire') {
     const reason = event.reason || 'retired hurt';
     const isOut = reason === 'retired out';
@@ -71,13 +75,26 @@ function updateScore(item, event, undoHistory = []) {
       pendingBatterOnStrike = wasOnStrike;
     }
 
+    const lastManBats = Boolean(item.lastManBats);
     const finalWickets = item.wickets + (isOut ? 1 : 0);
     const squadCount = item.battingPlayers?.length || (item.batters?.length ? item.batters.length + 1 : 11);
-    const allOut = Boolean(isOut && finalWickets >= squadCount - 1);
+    const maxWickets = lastManBats ? squadCount : Math.max(1, squadCount - 1);
+    const allOut = Boolean(isOut && finalWickets >= maxWickets);
     const inningComplete = allOut;
     const inningsBreak = Boolean(inningComplete && (item.inningsNumber || 1) === 1);
     const targetReached = Boolean((item.inningsNumber || 1) === 2 && item.target && item.score >= item.target);
     const matchComplete = Boolean((item.inningsNumber || 1) === 2 && (targetReached || inningComplete));
+
+    const isSoloLastMan = Boolean(isOut && !allOut && lastManBats && !subBatterName && finalWickets === squadCount - 1);
+    if (isSoloLastMan) {
+      const partner = batters.find((_, idx) => idx !== retireIdx);
+      if (partner) {
+        batters = [{ ...partner, onStrike: true, solo: true }];
+        pendingBatterSelection = false;
+        pendingBatterIndex = null;
+        pendingBatterOnStrike = null;
+      }
+    }
 
     const overHistory = [...(item.overHistory || [])];
     if (overHistory.length > 0) {
@@ -284,29 +301,40 @@ function updateScore(item, event, undoHistory = []) {
   const nextBatterIndex = item.nextBatterIndex ?? 2;
   const availableBatters = (item.battingPlayers || []).filter((name) => !(item.dismissedPlayers || []).includes(name) && !item.batters.some((batter) => batter.name === name));
   const nextBatterName = availableBatters?.[0];
+  const lastManBats = Boolean(item.lastManBats);
   const squadCount = item.battingPlayers?.length || (item.batters?.length ? item.batters.length + 1 : 11);
-  const allOut = Boolean(out && (item.wickets + 1 >= squadCount - 1));
+  const maxWickets = lastManBats ? squadCount : Math.max(1, squadCount - 1);
+  const finalWickets = item.wickets + (out ? 1 : 0);
+  const allOut = Boolean(out && (finalWickets >= maxWickets));
   const oversComplete = Boolean(item.totalOvers && totalBalls >= item.totalOvers * 6);
   const inningComplete = oversComplete || allOut;
   const inningsBreak = Boolean(inningComplete && (item.inningsNumber || 1) === 1);
   const targetReached = Boolean((item.inningsNumber || 1) === 2 && item.target && item.score + runs >= item.target);
   const matchComplete = Boolean((item.inningsNumber || 1) === 2 && (targetReached || inningComplete));
   const completed = inningsBreak || matchComplete;
+
+  const isSoloLastMan = Boolean(out && !completed && lastManBats && !nextBatterName && finalWickets < maxWickets);
+  if (isSoloLastMan) {
+    const partner = batters.find((_, idx) => idx !== dismissedIndex);
+    if (partner) {
+      batters = [{ ...partner, onStrike: true, solo: true }];
+    }
+  }
+
   const pendingBatterSelection = Boolean(out && nextBatterName && !completed);
   const pendingBowlerSelection = Boolean(overComplete && (item.bowlingPlayers?.length || 0) > 1 && !completed);
   const finalScore = item.score + runs;
-  const finalWickets = item.wickets + (out ? 1 : 0);
   const result = inningsBreak
     ? 'First innings complete'
     : matchComplete
     ? targetReached
-      ? `${item.home.name} won by ${Math.max(1, squadCount - finalWickets - 1)} wickets`
+      ? `${item.home.name} won by ${Math.max(1, maxWickets - finalWickets)} wickets`
       : finalScore === item.target - 1
       ? 'Match tied'
       : `${item.away.name} won by ${Math.max(0, item.target - 1 - finalScore)} runs`
     : item.result;
   const firstInnings = inningsBreak ? { team: item.home.name, score: finalScore, wickets: finalWickets, overs: overText, totalOvers: item.totalOvers, batters, battingCard, overHistory, bowlingStats, bowler: { ...item.bowler } } : item.firstInnings;
-  const next = { ...item, status: inningsBreak ? 'INNINGS_BREAK' : matchComplete ? 'AWAITING_END' : item.status, result, target: inningsBreak ? finalScore + 1 : item.target, firstInnings, score: finalScore, wickets: finalWickets, overs: overText, lastBalls: [...(item.lastBalls || []), ballLabel].slice(-6), overHistory, batters, battingCard, nextBatterIndex, dismissedPlayers: out ? [...(item.dismissedPlayers || []), dismissedName] : item.dismissedPlayers || [], pendingBatterSelection, pendingBatterIndex: pendingBatterSelection ? dismissedIndex : null, pendingBatterOnStrike: pendingBatterSelection ? (overComplete ? (dismissedIndex !== strikerIndex) : (dismissedIndex === strikerIndex)) : null, pendingBowlerSelection, bowlingStats, bowler: { name: nextBowlerName, runs: bowlerStats.runs, wickets: bowlerStats.wickets, legalBalls: bowlerStats.legalBalls, overs: `${Math.floor(bowlerStats.legalBalls / 6)}.${bowlerStats.legalBalls % 6}` }, noBallRun: noBallPenalty };
+  const next = { ...item, status: inningsBreak ? 'INNINGS_BREAK' : matchComplete ? 'AWAITING_END' : item.status, result, target: inningsBreak ? finalScore + 1 : item.target, firstInnings, score: finalScore, wickets: finalWickets, overs: overText, lastBalls: [...(item.lastBalls || []), ballLabel].slice(-6), overHistory, batters, battingCard, nextBatterIndex, dismissedPlayers: out ? [...(item.dismissedPlayers || []), dismissedName] : item.dismissedPlayers || [], pendingBatterSelection, pendingBatterIndex: pendingBatterSelection ? dismissedIndex : null, pendingBatterOnStrike: pendingBatterSelection ? (overComplete ? (dismissedIndex !== strikerIndex) : (dismissedIndex === strikerIndex)) : null, pendingBowlerSelection, bowlingStats, bowler: { name: nextBowlerName, runs: bowlerStats.runs, wickets: bowlerStats.wickets, legalBalls: bowlerStats.legalBalls, overs: `${Math.floor(bowlerStats.legalBalls / 6)}.${bowlerStats.legalBalls % 6}` }, noBallRun: noBallPenalty, lastManBats };
   return { item: next, undoHistory: [...undoHistory, item] };
 }
 
@@ -1017,6 +1045,101 @@ it('TEST 24: WhatsApp Match Summary Generator formats scores, top performers, Po
   assert.ok(text.includes('Jasprit Bumrah: 3/24'), 'Top bowler figures present');
   assert.ok(text.includes('Rohit Sharma'), 'POTM present');
   assert.ok(text.includes('whatsapp') || text.includes('Pitch Cricket'), 'Footer branding present');
+});
+
+it('TEST 25: Gully Cricket - Last player bats alone when N-1 wickets fall', () => {
+  // 4 player squad: A, B, C, D
+  const squad = ['Batter A', 'Batter B', 'Batter C', 'Batter D'];
+  let match = {
+    id: 'test-gully-1',
+    status: 'LIVE',
+    inningsNumber: 1,
+    overs: '1.0',
+    totalOvers: 5,
+    score: 20,
+    wickets: 2, // 2 wickets already down: Batter A and Batter B out
+    battingPlayers: squad,
+    dismissedPlayers: ['Batter A', 'Batter B'],
+    batters: [
+      { name: 'Batter C', runs: 8, balls: 6, fours: 1, sixes: 0, onStrike: true },
+      { name: 'Batter D', runs: 2, balls: 3, fours: 0, sixes: 0, onStrike: false },
+    ],
+    bowler: { name: 'Bowler X', overs: '1.0', runs: 8, wickets: 2, legalBalls: 6 },
+    lastManBats: true,
+  };
+
+  // Batter C (on strike) gets bowled -> 3rd wicket falls (N-1 wickets for 4 players)
+  const afterWicket = updateScore(match, { type: 'Wicket', dismissalType: 'Bowled', dismissedBatter: 'Batter C' });
+  const m1 = afterWicket.item;
+
+  assert.strictEqual(m1.wickets, 3, 'Wickets should be 3');
+  assert.strictEqual(m1.status, 'LIVE', 'Match should still be LIVE, not all out');
+  assert.strictEqual(m1.pendingBatterSelection, false, 'No pending batter selection prompt because bench is empty');
+  assert.strictEqual(m1.batters.length, 1, 'Only 1 batter remaining (solo batter)');
+  assert.strictEqual(m1.batters[0].name, 'Batter D', 'Batter D should be the solo batter');
+  assert.strictEqual(m1.batters[0].onStrike, true, 'Batter D must be on strike');
+  assert.strictEqual(m1.batters[0].solo, true, 'Batter D should have solo flag set to true');
+
+  // Solo batter scores a single (1 run)
+  const afterSingle = updateScore(m1, 1);
+  const m2 = afterSingle.item;
+  assert.strictEqual(m2.score, 21, 'Score should increase to 21');
+  assert.strictEqual(m2.batters.length, 1, 'Still 1 batter');
+  assert.strictEqual(m2.batters[0].onStrike, true, 'Strike should remain on solo batter on odd runs');
+  assert.strictEqual(m2.batters[0].runs, 3, 'Batter D runs updated');
+
+  // Next delivery completes the over (Ball 6) with 2 runs
+  m2.overs = '1.5';
+  const afterOver = updateScore(m2, 2);
+  const m3 = afterOver.item;
+  assert.strictEqual(m3.overs, '2.0', 'Over completes');
+  assert.strictEqual(m3.batters[0].onStrike, true, 'Strike should remain on solo batter across overs');
+});
+
+it('TEST 26: Gully Cricket - Team is all-out only when all N wickets fall with lastManBats: true', () => {
+  const squad = ['Batter A', 'Batter B', 'Batter C', 'Batter D'];
+  // Solo batter Batter D batting alone at 3 wickets
+  let soloMatch = {
+    id: 'test-gully-2',
+    status: 'LIVE',
+    inningsNumber: 1,
+    overs: '2.1',
+    totalOvers: 5,
+    score: 25,
+    wickets: 3,
+    battingPlayers: squad,
+    dismissedPlayers: ['Batter A', 'Batter B', 'Batter C'],
+    batters: [
+      { name: 'Batter D', runs: 7, balls: 6, fours: 1, sixes: 0, onStrike: true, solo: true },
+    ],
+    bowler: { name: 'Bowler Y', overs: '0.1', runs: 2, wickets: 0, legalBalls: 1 },
+    home: { name: 'Gully Boys' },
+    away: { name: 'Street Champs' },
+    lastManBats: true,
+  };
+
+  // Batter D gets caught -> 4th wicket falls (N wickets out of N squad)
+  const finalBall = updateScore(soloMatch, { type: 'Wicket', dismissalType: 'Caught', dismissedBatter: 'Batter D' });
+  const finalMatch = finalBall.item;
+
+  assert.strictEqual(finalMatch.wickets, 4, 'All 4 wickets fell');
+  assert.strictEqual(finalMatch.status, 'INNINGS_BREAK', 'Innings breaks on 4th wicket (all out)');
+  assert.strictEqual(finalMatch.target, 26, 'Target is 26 runs');
+
+  // Verify contrast with standard cricket (lastManBats: false):
+  // 4 player squad is all-out at 3 wickets (N-1)
+  let standardMatch = {
+    ...soloMatch,
+    wickets: 2,
+    batters: [
+      { name: 'Batter C', runs: 8, balls: 6, fours: 1, sixes: 0, onStrike: true },
+      { name: 'Batter D', runs: 2, balls: 3, fours: 0, sixes: 0, onStrike: false },
+    ],
+    lastManBats: false,
+  };
+  const stdWicket = updateScore(standardMatch, { type: 'Wicket', dismissalType: 'Bowled', dismissedBatter: 'Batter C' });
+  assert.strictEqual(stdWicket.item.wickets, 3, '3 wickets fell');
+  assert.strictEqual(stdWicket.item.status, 'INNINGS_BREAK', 'Standard cricket is all out at N-1 (3 wickets)');
 });
 
 console.log(`\nResults: ${passed} / ${total} tests passed.\n`);

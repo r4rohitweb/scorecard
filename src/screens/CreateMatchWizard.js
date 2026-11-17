@@ -72,6 +72,7 @@ export default function CreateMatchWizard({ allPlayers = [], onAddPlayer, onClos
   const [nonStriker, setNonStriker] = useState('');
   const [bowler, setBowler] = useState('');
   const [noBallRun, setNoBallRun] = useState(0);
+  const [lastManBats, setLastManBats] = useState(true);
 
   const overs = oversChoice === 'custom' ? Number(customOvers) : Number(oversChoice);
   const battingPlayers = battingFirst === 1 ? players1 : players2;
@@ -160,6 +161,7 @@ export default function CreateMatchWizard({ allPlayers = [], onAddPlayer, onClos
       nonStriker,
       bowler,
       noBallRun,
+      lastManBats,
     });
   };
 
@@ -246,6 +248,43 @@ export default function CreateMatchWizard({ allPlayers = [], onAddPlayer, onClos
                     <Pressable
                       key={rule.value}
                       onPress={() => setNoBallRun(rule.value)}
+                      style={{
+                        flex: 1,
+                        paddingVertical: 12,
+                        paddingHorizontal: 12,
+                        borderRadius: 14,
+                        backgroundColor: active ? '#E6F1EB' : 'white',
+                        borderWidth: 1.5,
+                        borderColor: active ? colors.green : colors.line,
+                      }}
+                    >
+                      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <Text style={{ color: active ? colors.green : '#253129', fontSize: 11, fontWeight: '800' }}>
+                          {rule.label}
+                        </Text>
+                        {active && <Ionicons name="checkmark-circle" color={colors.green} size={15} />}
+                      </View>
+                      <Text style={{ color: active ? '#2D6B53' : colors.muted, fontSize: 9, marginTop: 4 }}>
+                        {rule.desc}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </View>
+
+            <View style={{ marginTop: 17 }}>
+              <FieldLabel>LAST PLAYER BATS? (GULLY CRICKET RULE)</FieldLabel>
+              <View style={{ flexDirection: 'row', gap: 10 }}>
+                {[
+                  { value: true, label: 'Yes (Gully Cricket)', desc: 'Last batter plays alone. All wickets must fall.' },
+                  { value: false, label: 'No (Standard)', desc: 'Team all-out when N-1 wickets fall.' },
+                ].map((rule) => {
+                  const active = lastManBats === rule.value;
+                  return (
+                    <Pressable
+                      key={String(rule.value)}
+                      onPress={() => setLastManBats(rule.value)}
                       style={{
                         flex: 1,
                         paddingVertical: 12,
