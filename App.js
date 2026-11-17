@@ -694,9 +694,173 @@ function AppContent() {
   if (!signedIn) return <SafeAreaView className="flex-1" style={{ width: '100%', alignSelf: 'stretch', backgroundColor: mode === 'dark' ? '#111814' : '#F8F9F6' }}><StatusBar barStyle="dark-content" backgroundColor={mode === 'dark' ? '#111814' : '#F8F9F6'} /><Auth onSuccess={() => setSignedIn(true)} /></SafeAreaView>;
   if (createVisible) return <SafeAreaView className="flex-1" style={{ width: '100%', alignSelf: 'stretch', backgroundColor: mode === 'dark' ? '#111814' : '#F8F9F6' }}><StatusBar barStyle="dark-content" backgroundColor={mode === 'dark' ? '#111814' : '#F8F9F6'} /><CreateMatchWizard allPlayers={allPlayers} onAddPlayer={handleAddPlayer} onClose={() => setCreateVisible(false)} onStart={startMatch} /></SafeAreaView>;
   return <SafeAreaView className="flex-1" style={{ width: '100%', alignSelf: 'stretch', backgroundColor: mode === 'dark' ? '#111814' : '#F8F9F6' }}><StatusBar barStyle="dark-content" backgroundColor={mode === 'dark' ? '#111814' : '#F8F9F6'} />
-    {!selectedMatch ? <><View style={{ height: 57, paddingHorizontal: 21, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}><View style={{ flexDirection: 'row', alignItems: 'center' }}><View style={{ height: 31, width: 31, borderRadius: 11, backgroundColor: '#187B62', alignItems: 'center', justifyContent: 'center', marginRight: 9 }}><Ionicons name="radio-button-on" size={17} color="white" /></View><Text style={{ color: '#18362B', fontSize: 20, fontWeight: '900', letterSpacing: -.7 }}>pitch<Text style={{ color: '#187B62' }}>.</Text></Text></View><Pressable onPress={() => setTab('Profile')} style={{ width: 36, height: 36, borderRadius: 14, backgroundColor: '#E8F0EA', alignItems: 'center', justifyContent: 'center' }}><Text style={{ color: '#187B62', fontSize: 11, fontWeight: '800' }}>RP</Text><View style={{ position: 'absolute', right: -1, top: -1, width: 9, height: 9, backgroundColor: '#D96B50', borderRadius: 5, borderWidth: 1.5, borderColor: '#F8F9F6' }} /></Pressable></View>
-      <View style={{ flex: 1 }}>{tab === 'Home' ? <Dashboard matches={scoreMatches} onOpenMatch={openMatch} onCreateMatch={() => setCreateVisible(true)} onLiveScore={openLiveScore} onNavigate={goTab} /> : tab === 'Matches' ? <Matches matches={scoreMatches} onOpenMatch={openMatch} onCreateMatch={() => setCreateVisible(true)} /> : tab === 'Teams' ? <Teams players={allPlayers} matches={scoreMatches} onAddPlayer={handleAddPlayer} onEditPlayer={handleEditPlayer} onDeletePlayer={handleDeletePlayer} /> : <Profile mode={mode} onToggleTheme={toggleMode} onSignOut={() => setSignedIn(false)} />}</View>
-      <View style={{ flexDirection: 'row', backgroundColor: 'white', paddingTop: 8, paddingBottom: 5, borderTopWidth: 1, borderTopColor: '#ECEFEC' }}>{tabs.map((item) => { const active = tab === item.name; return <Pressable onPress={() => goTab(item.name)} key={item.name} style={{ flex: 1, alignItems: 'center', paddingVertical: 3 }}><Ionicons name={active ? item.active : item.icon} size={20} color={active ? '#187B62' : '#909B93'} /><Text style={{ color: active ? '#187B62' : '#909B93', fontSize: 9, fontWeight: active ? '800' : '600', marginTop: 3 }}>{item.name}</Text>{active && <View style={{ width: 4, height: 4, borderRadius: 3, backgroundColor: '#187B62', marginTop: 3 }} />}</Pressable>; })}</View></> : <View style={{ flex: 1 }}>{selectedMatch.status === 'COMPLETED' || selectedMatch.status === 'UPCOMING' ? <MatchScorecard match={selectedMatch} onBack={() => setSelectedMatch(null)} /> : <LiveMatch match={selectedMatch} onBack={() => setSelectedMatch(null)} onUpdate={updateScore} onSelectBatter={selectNextBatter} onSelectBowler={selectNextBowler} onStartSecondInnings={startSecondInnings} onEndMatch={endMatch} milestoneCelebration={milestoneCelebration} onDismissMilestone={() => setMilestoneCelebration(null)} />}</View>}
+    {!selectedMatch ? (
+      <>
+        <View
+          style={{
+            height: 60,
+            paddingHorizontal: 20,
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            backgroundColor: 'white',
+            borderBottomWidth: 1,
+            borderBottomColor: '#EEF1EE',
+          }}
+        >
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <View
+              style={{
+                height: 35,
+                width: 35,
+                borderRadius: 12,
+                backgroundColor: '#187B62',
+                alignItems: 'center',
+                justifyContent: 'center',
+                marginRight: 10,
+                shadowColor: '#187B62',
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.25,
+                shadowRadius: 3,
+                elevation: 2,
+              }}
+            >
+              <Ionicons name="baseball" size={19} color="white" />
+            </View>
+            <View>
+              <Text style={{ color: '#102E23', fontSize: 21, fontWeight: '900', letterSpacing: -0.8 }}>
+                pitch<Text style={{ color: '#187B62' }}>.</Text>
+              </Text>
+            </View>
+          </View>
+
+          <Pressable
+            onPress={() => setTab('Profile')}
+            style={{
+              width: 38,
+              height: 38,
+              borderRadius: 14,
+              backgroundColor: '#EAF4EF',
+              borderWidth: 1.5,
+              borderColor: '#D0E6DB',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <Text style={{ color: '#187B62', fontSize: 12, fontWeight: '900' }}>RP</Text>
+            <View
+              style={{
+                position: 'absolute',
+                right: -2,
+                top: -2,
+                width: 10,
+                height: 10,
+                backgroundColor: '#22C55E',
+                borderRadius: 5,
+                borderWidth: 2,
+                borderColor: 'white',
+              }}
+            />
+          </Pressable>
+        </View>
+
+        <View style={{ flex: 1 }}>
+          {tab === 'Home' ? (
+            <Dashboard
+              matches={scoreMatches}
+              onOpenMatch={openMatch}
+              onCreateMatch={() => setCreateVisible(true)}
+              onLiveScore={openLiveScore}
+              onNavigate={goTab}
+            />
+          ) : tab === 'Matches' ? (
+            <Matches matches={scoreMatches} onOpenMatch={openMatch} onCreateMatch={() => setCreateVisible(true)} />
+          ) : tab === 'Teams' ? (
+            <Teams
+              players={allPlayers}
+              matches={scoreMatches}
+              onAddPlayer={handleAddPlayer}
+              onEditPlayer={handleEditPlayer}
+              onDeletePlayer={handleDeletePlayer}
+            />
+          ) : (
+            <Profile mode={mode} onToggleTheme={toggleMode} onSignOut={() => setSignedIn(false)} />
+          )}
+        </View>
+
+        <View
+          style={{
+            flexDirection: 'row',
+            backgroundColor: 'white',
+            paddingTop: 8,
+            paddingBottom: 7,
+            borderTopWidth: 1,
+            borderTopColor: '#ECEFEC',
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: -3 },
+            shadowOpacity: 0.04,
+            shadowRadius: 6,
+            elevation: 8,
+          }}
+        >
+          {tabs.map((item) => {
+            const active = tab === item.name;
+            return (
+              <Pressable
+                onPress={() => goTab(item.name)}
+                key={item.name}
+                style={{
+                  flex: 1,
+                  alignItems: 'center',
+                  paddingVertical: 2,
+                }}
+              >
+                <View
+                  style={{
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    paddingHorizontal: 14,
+                    paddingVertical: 3,
+                    borderRadius: 14,
+                    backgroundColor: active ? '#EAF4EF' : 'transparent',
+                  }}
+                >
+                  <Ionicons name={active ? item.active : item.icon} size={20} color={active ? '#187B62' : '#8A968E'} />
+                  <Text
+                    style={{
+                      color: active ? '#187B62' : '#8A968E',
+                      fontSize: 10,
+                      fontWeight: active ? '800' : '600',
+                      marginTop: 2,
+                    }}
+                  >
+                    {item.name}
+                  </Text>
+                </View>
+              </Pressable>
+            );
+          })}
+        </View>
+      </>
+    ) : (
+      <View style={{ flex: 1 }}>
+        {selectedMatch.status === 'COMPLETED' || selectedMatch.status === 'UPCOMING' ? (
+          <MatchScorecard match={selectedMatch} onBack={() => setSelectedMatch(null)} />
+        ) : (
+          <LiveMatch
+            match={selectedMatch}
+            onBack={() => setSelectedMatch(null)}
+            onUpdate={updateScore}
+            onSelectBatter={selectNextBatter}
+            onSelectBowler={selectNextBowler}
+            onStartSecondInnings={startSecondInnings}
+            onEndMatch={endMatch}
+            milestoneCelebration={milestoneCelebration}
+            onDismissMilestone={() => setMilestoneCelebration(null)}
+          />
+        )}
+      </View>
+    )}
     {milestoneCelebration ? (
       <Pressable
         onPress={() => setMilestoneCelebration(null)}

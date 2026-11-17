@@ -3,10 +3,34 @@ import { Modal, Pressable, ScrollView, Text, View, shareToWhatsApp } from '../th
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from '../theme/native';
 import { getTeam } from '../data/mockData';
-import { Pill, TeamMark } from '../components/UI';
+import { Pill, TeamMark, DeliveryBall } from '../components/UI';
 import { calculatePlayerOfMatch, generateWhatsAppSummary } from '../data/statsHelper';
 
-function Stat({ label, value }) { return <View style={{ flex: 1 }}><Text style={{ color: '#A9C3B8', fontSize: 9, letterSpacing: .7 }}>{label}</Text><Text style={{ color: 'white', fontSize: 17, fontWeight: '800', marginTop: 5 }}>{value}</Text></View>; }
+function Stat({ label, value, sub }) {
+  return (
+    <View
+      style={{
+        flex: 1,
+        backgroundColor: 'rgba(255, 255, 255, 0.08)',
+        borderRadius: 14,
+        paddingVertical: 9,
+        paddingHorizontal: 6,
+        borderWidth: 1,
+        borderColor: 'rgba(255, 255, 255, 0.12)',
+        alignItems: 'center',
+        marginHorizontal: 3,
+      }}
+    >
+      <Text style={{ color: '#9EC2B4', fontSize: 9, letterSpacing: 0.8, fontWeight: '800' }}>
+        {label}
+      </Text>
+      <Text numberOfLines={1} style={{ color: 'white', fontSize: 15, fontWeight: '900', marginTop: 3 }}>
+        {value}
+      </Text>
+      {sub ? <Text style={{ color: '#C0D5CB', fontSize: 9, marginTop: 1 }}>{sub}</Text> : null}
+    </View>
+  );
+}
 function StrikerIndicator({ size = 14 }) { return <View style={{ width: size, height: size, borderRadius: size / 2, borderWidth: 1, borderColor: '#0C604B', backgroundColor: '#187B62', alignItems: 'center', justifyContent: 'center', marginRight: 6, shadowColor: '#0C604B', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.35, shadowRadius: 2, elevation: 3 }}><View style={{ width: size * 0.36, height: size * 0.36, borderRadius: size, backgroundColor: '#E4F4EB' }} /></View>; }
 function BallResult({ label, color = '#425047' }) { return label === 'DOT' ? <Ionicons name="ellipse" size={7} color={color} /> : <Text style={{ color, fontSize: 9, fontWeight: '800' }}>{label}</Text>; }
 function PlayerPrompt({ visible, title, subtitle, players, color, onSelect, stats = {} }) {
@@ -837,10 +861,86 @@ export default function LiveMatch({ match, onBack, onUpdate, onSelectBatter, onS
   const currentRunRate = totalBallsBowled ? (match.score / (totalBallsBowled / 6)).toFixed(2) : '0.00';
   const requiredRunRate = ballsRemaining ? (runsRequired / (ballsRemaining / 6)).toFixed(2) : '0.00';
   return <View style={{ flex: 1 }}><ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 25 }}>
-    <LinearGradient colors={['#103C2E', '#0C2F25']} style={{ padding: 20, paddingBottom: 22, borderBottomLeftRadius: 25, borderBottomRightRadius: 25 }}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}><Pressable onPress={onBack} style={{ width: 36, height: 36, borderRadius: 13, backgroundColor: '#FFFFFF18', alignItems: 'center', justifyContent: 'center' }}><Ionicons name="arrow-back" size={18} color="white" /></Pressable><Pill color="#FFB4A2" bg="#FFFFFF18">{match.status === 'INNINGS_BREAK' ? 'INNINGS BREAK' : match.status === 'AWAITING_END' ? 'RESULT  -  END MATCH' : match.status === 'COMPLETED' ? 'MATCH COMPLETE' : 'LIVE'}</Pill><Pressable onPress={() => shareToWhatsApp(generateWhatsAppSummary(match))} style={{ width: 36, height: 36, borderRadius: 13, backgroundColor: '#FFFFFF18', alignItems: 'center', justifyContent: 'center' }}><Ionicons name="logo-whatsapp" size={18} color="#43BA91" /></Pressable></View>
-      <Text style={{ color: '#A9C3B8', fontSize: 10, letterSpacing: 1, fontWeight: '700', textAlign: 'center' }}>{match.format}  -  {match.venue}</Text><View style={{ flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 15, marginTop: 16 }}><View style={{ alignItems: 'center' }}><TeamMark team={batting} size={48} /><Text style={{ color: 'white', fontWeight: '700', fontSize: 11, marginTop: 7 }}>{batting.short}</Text></View><View style={{ alignItems: 'center' }}><Text style={{ color: 'white', fontSize: 39, fontWeight: '800', letterSpacing: -1 }}>{match.score}<Text style={{ color: '#C4D5CC', fontSize: 23 }}>/{match.wickets}</Text></Text><Text style={{ color: '#B6C9C0', fontSize: 13, marginTop: -1 }}>{match.overs} <Text style={{ color: '#8CA99B' }}>overs</Text></Text></View><View style={{ alignItems: 'center' }}><TeamMark team={bowling} size={48} /><Text style={{ color: 'white', fontWeight: '700', fontSize: 11, marginTop: 7 }}>{bowling.short}</Text></View></View>
-      <View style={{ height: 1, backgroundColor: '#FFFFFF22', marginVertical: 17 }} /><View style={{ flexDirection: 'row' }}>{match.inningsNumber === 2 ? <><Stat label="CRR" value={currentRunRate} /><Stat label="TARGET" value={match.target} /><Stat label="REQUIRED" value={`${runsRequired} off ${ballsRemaining}`} /></> : <><Stat label="OVERS" value={`${match.overs} / ${match.totalOvers || 20}`} /><Stat label={match.status === 'INNINGS_BREAK' ? 'TARGET' : 'INNINGS'} value={match.status === 'INNINGS_BREAK' ? match.target : match.status === 'LIVE' ? '1ST' : 'COMPLETE'} /><Stat label="BOWLER" value={match.bowler.name} /></>}</View>
+    <LinearGradient colors={['#0C382A', '#061F17']} style={{ padding: 20, paddingBottom: 22, borderBottomLeftRadius: 28, borderBottomRightRadius: 28 }}>
+      {/* Top action row */}
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+        <Pressable
+          onPress={onBack}
+          style={{ width: 38, height: 38, borderRadius: 14, backgroundColor: 'rgba(255,255,255,0.12)', alignItems: 'center', justifyContent: 'center' }}
+        >
+          <Ionicons name="arrow-back" size={18} color="white" />
+        </Pressable>
+        
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: 'rgba(255,255,255,0.12)', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 20, borderWidth: 1, borderColor: 'rgba(255,255,255,0.18)' }}>
+          <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: match.status === 'LIVE' ? '#4ADE80' : '#F59E0B' }} />
+          <Text style={{ color: 'white', fontSize: 10, fontWeight: '900', letterSpacing: 0.8 }}>
+            {match.status === 'INNINGS_BREAK' ? 'INNINGS BREAK' : match.status === 'AWAITING_END' ? 'RESULT' : match.status === 'COMPLETED' ? 'COMPLETED' : 'LIVE SCORING'}
+          </Text>
+        </View>
+
+        <Pressable
+          onPress={() => shareToWhatsApp(generateWhatsAppSummary(match))}
+          style={{ width: 38, height: 38, borderRadius: 14, backgroundColor: 'rgba(37, 211, 102, 0.2)', borderWidth: 1, borderColor: 'rgba(37, 211, 102, 0.4)', alignItems: 'center', justifyContent: 'center' }}
+        >
+          <Ionicons name="logo-whatsapp" size={19} color="#25D366" />
+        </Pressable>
+      </View>
+
+      <Text style={{ color: '#8FB4A4', fontSize: 10, letterSpacing: 1.1, fontWeight: '800', textAlign: 'center' }}>
+        {match.format?.toUpperCase()} • {match.venue?.toUpperCase()}
+      </Text>
+
+      {/* Main Scoreboard Display */}
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 14 }}>
+        <View style={{ alignItems: 'center', width: 76 }}>
+          <TeamMark team={batting} size={48} />
+          <Text numberOfLines={1} style={{ color: 'white', fontWeight: '800', fontSize: 12, marginTop: 6 }}>
+            {batting.short}
+          </Text>
+          <View style={{ backgroundColor: 'rgba(74, 222, 128, 0.2)', paddingHorizontal: 6, paddingVertical: 1, borderRadius: 5, marginTop: 2 }}>
+            <Text style={{ color: '#4ADE80', fontSize: 8, fontWeight: '900' }}>BATTING</Text>
+          </View>
+        </View>
+
+        <View style={{ alignItems: 'center' }}>
+          <Text style={{ color: 'white', fontSize: 44, fontWeight: '900', letterSpacing: -1.5 }}>
+            {match.score}
+            <Text style={{ color: '#82A897', fontSize: 26, fontWeight: '700' }}>/{match.wickets}</Text>
+          </Text>
+          <View style={{ backgroundColor: 'rgba(255,255,255,0.12)', paddingHorizontal: 10, paddingVertical: 3, borderRadius: 12, marginTop: 2 }}>
+            <Text style={{ color: '#D4E6DC', fontSize: 12, fontWeight: '800' }}>
+              {match.overs} <Text style={{ color: '#8FB4A4', fontSize: 11, fontWeight: '600' }}>/ {match.totalOvers || 20} ov</Text>
+            </Text>
+          </View>
+        </View>
+
+        <View style={{ alignItems: 'center', width: 76 }}>
+          <TeamMark team={bowling} size={48} />
+          <Text numberOfLines={1} style={{ color: '#C4D5CC', fontWeight: '800', fontSize: 12, marginTop: 6 }}>
+            {bowling.short}
+          </Text>
+          <View style={{ backgroundColor: 'rgba(255,255,255,0.08)', paddingHorizontal: 6, paddingVertical: 1, borderRadius: 5, marginTop: 2 }}>
+            <Text style={{ color: '#A9C3B8', fontSize: 8, fontWeight: '700' }}>BOWLING</Text>
+          </View>
+        </View>
+      </View>
+
+      {/* Stats Container */}
+      <View style={{ flexDirection: 'row', marginTop: 18 }}>
+        {match.inningsNumber === 2 ? (
+          <>
+            <Stat label="CRR" value={currentRunRate} />
+            <Stat label="TARGET" value={match.target} />
+            <Stat label="NEED" value={`${runsRequired}`} sub={`${ballsRemaining}b left`} />
+          </>
+        ) : (
+          <>
+            <Stat label="CRR" value={currentRunRate} />
+            <Stat label={match.status === 'INNINGS_BREAK' ? 'TARGET' : 'INNINGS'} value={match.status === 'INNINGS_BREAK' ? match.target : '1ST'} />
+            <Stat label="BOWLER" value={match.bowler?.name || '-'} />
+          </>
+        )}
+      </View>
     </LinearGradient>
     <View style={{ paddingHorizontal: 20, paddingTop: 20 }}>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 13 }}>
@@ -939,156 +1039,340 @@ export default function LiveMatch({ match, onBack, onUpdate, onSelectBatter, onS
           </View>
         </View>
       )}
-      <View style={{ backgroundColor: 'white', borderRadius: 16, borderWidth: 1, borderColor: '#EDF0ED', overflow: 'hidden' }}><View style={{ flexDirection: 'row', padding: 12, backgroundColor: '#F4F7F4' }}><Text style={{ flex: 1.6, color: '#78857C', fontSize: 9, fontWeight: '700' }}>BATTER</Text>{['R', 'B', '4s', '6s', 'SR'].map((v) => <Text key={v} style={{ width: 34, textAlign: 'right', color: '#78857C', fontSize: 9, fontWeight: '700' }}>{v}</Text>)}</View>{match.batters.map((batter) => {
-      const cardEntry = match.battingCard?.find((b) => b.name === batter.name);
-      const fours = cardEntry?.fours ?? batter.fours ?? 0;
-      const sixes = cardEntry?.sixes ?? batter.sixes ?? 0;
-      const sr = batter.balls ? ((batter.runs || 0) * 100 / batter.balls).toFixed(1) : '0.0';
-      return <View key={batter.name} style={{ flexDirection: 'row', alignItems: 'center', padding: 12, borderTopWidth: 1, borderColor: '#F0F2F0' }}>
-        <View style={{ flex: 1.6, flexDirection: 'row', alignItems: 'center' }}>
-          {batter.onStrike && <StrikerIndicator size={13} />}
-          <Text numberOfLines={1} style={{ flex: 1, color: '#253129', fontSize: 11, fontWeight: batter.onStrike ? '800' : '600' }}>{batter.name}</Text>
-          {(batter.solo || match.batters.length === 1) && (
-            <View style={{ backgroundColor: '#FEF3C7', paddingHorizontal: 5, paddingVertical: 1, borderRadius: 5, marginLeft: 4 }}>
-              <Text style={{ color: '#B45309', fontSize: 8, fontWeight: '800' }}>SOLO</Text>
-            </View>
-          )}
-          {batter.runs >= 100 ? (
-            <View style={{ backgroundColor: '#FEF3C7', paddingHorizontal: 5, paddingVertical: 1, borderRadius: 5, marginLeft: 4 }}>
-              <Text style={{ color: '#B45309', fontSize: 8, fontWeight: '800' }}>👑 100</Text>
-            </View>
-          ) : batter.runs >= 50 ? (
-            <View style={{ backgroundColor: '#D1FAE5', paddingHorizontal: 5, paddingVertical: 1, borderRadius: 5, marginLeft: 4 }}>
-              <Text style={{ color: '#065F46', fontSize: 8, fontWeight: '800' }}>⭐ 50</Text>
-            </View>
-          ) : null}
+      <View style={{ backgroundColor: 'white', borderRadius: 18, borderWidth: 1, borderColor: '#EDF0ED', overflow: 'hidden', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.04, shadowRadius: 6, elevation: 2 }}>
+        <View style={{ flexDirection: 'row', paddingVertical: 10, paddingHorizontal: 12, backgroundColor: '#F4F7F4' }}>
+          <Text style={{ flex: 1.6, color: '#68756C', fontSize: 10, fontWeight: '800', letterSpacing: 0.5 }}>BATTER</Text>
+          {['R', 'B', '4s', '6s', 'SR'].map((v) => (
+            <Text key={v} style={{ width: 34, textAlign: 'right', color: '#68756C', fontSize: 10, fontWeight: '800' }}>
+              {v}
+            </Text>
+          ))}
         </View>
-        {[batter.runs, batter.balls, fours, sixes, sr].map((v, i) => <Text key={i} style={{ width: 34, textAlign: 'right', color: i === 0 ? '#253129' : '#6F7B73', fontSize: 10, fontWeight: i === 0 ? '800' : '500' }}>{v}</Text>)}
-      </View>;
-    })}
-    {match.battingCard?.some((b) => b.dismissed || b.howOut) && (
-      <View style={{ paddingHorizontal: 12, paddingVertical: 9, backgroundColor: '#FAFBF9', borderTopWidth: 1, borderTopColor: '#F0F2F0' }}>
-        <Text style={{ color: '#87928A', fontSize: 9, fontWeight: '800', letterSpacing: 0.6, marginBottom: 5 }}>FALLEN WICKETS & RETIREMENTS</Text>
-        {match.battingCard.filter((b) => b.dismissed || b.howOut).map((b) => (
-          <View key={b.name} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 2 }}>
-            <Text style={{ color: '#253129', fontSize: 10, fontWeight: '700' }}>{b.name}</Text>
-            <Text style={{ color: b.howOut === 'retired hurt' ? '#187B62' : '#C6533C', fontSize: 9, fontWeight: '600' }}>{b.howOut || 'Out'} <Text style={{ color: '#87928A' }}>({b.runs}r, {b.balls}b)</Text></Text>
+        {match.batters.map((batter) => {
+          const cardEntry = match.battingCard?.find((b) => b.name === batter.name);
+          const fours = cardEntry?.fours ?? batter.fours ?? 0;
+          const sixes = cardEntry?.sixes ?? batter.sixes ?? 0;
+          const sr = batter.balls ? ((batter.runs || 0) * 100 / batter.balls).toFixed(1) : '0.0';
+          const isOnStrike = batter.onStrike;
+          return (
+            <View
+              key={batter.name}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                paddingVertical: 12,
+                paddingHorizontal: 12,
+                borderTopWidth: 1,
+                borderColor: '#F0F2F0',
+                backgroundColor: isOnStrike ? '#F0F9F5' : 'white',
+                borderLeftWidth: isOnStrike ? 3.5 : 0,
+                borderLeftColor: '#187B62',
+              }}
+            >
+              <View style={{ flex: 1.6, flexDirection: 'row', alignItems: 'center' }}>
+                {isOnStrike && (
+                  <View style={{ backgroundColor: '#187B62', paddingHorizontal: 5, paddingVertical: 2, borderRadius: 5, marginRight: 6 }}>
+                    <Text style={{ color: 'white', fontSize: 8, fontWeight: '900' }}>STRIKE</Text>
+                  </View>
+                )}
+                <Text numberOfLines={1} style={{ flex: 1, color: '#1B2921', fontSize: 12, fontWeight: isOnStrike ? '900' : '700' }}>
+                  {batter.name}
+                </Text>
+                {(batter.solo || match.batters.length === 1) && (
+                  <View style={{ backgroundColor: '#FEF3C7', paddingHorizontal: 5, paddingVertical: 2, borderRadius: 5, marginLeft: 4 }}>
+                    <Text style={{ color: '#B45309', fontSize: 8, fontWeight: '900' }}>SOLO</Text>
+                  </View>
+                )}
+                {batter.runs >= 100 ? (
+                  <View style={{ backgroundColor: '#FEF3C7', paddingHorizontal: 5, paddingVertical: 2, borderRadius: 5, marginLeft: 4 }}>
+                    <Text style={{ color: '#B45309', fontSize: 8, fontWeight: '900' }}>👑 100</Text>
+                  </View>
+                ) : batter.runs >= 50 ? (
+                  <View style={{ backgroundColor: '#D1FAE5', paddingHorizontal: 5, paddingVertical: 2, borderRadius: 5, marginLeft: 4 }}>
+                    <Text style={{ color: '#065F46', fontSize: 8, fontWeight: '900' }}>⭐ 50</Text>
+                  </View>
+                ) : null}
+              </View>
+              {[batter.runs, batter.balls, fours, sixes, sr].map((v, i) => (
+                <Text
+                  key={i}
+                  style={{
+                    width: 34,
+                    textAlign: 'right',
+                    color: i === 0 ? '#103C2E' : '#6F7B73',
+                    fontSize: i === 0 ? 12 : 11,
+                    fontWeight: i === 0 ? '900' : '600',
+                  }}
+                >
+                  {v}
+                </Text>
+              ))}
+            </View>
+          );
+        })}
+        {match.battingCard?.some((b) => b.dismissed || b.howOut) && (
+          <View style={{ paddingHorizontal: 14, paddingVertical: 10, backgroundColor: '#FAFBF9', borderTopWidth: 1, borderTopColor: '#F0F2F0' }}>
+            <Text style={{ color: '#78857C', fontSize: 10, fontWeight: '800', letterSpacing: 0.6, marginBottom: 6 }}>
+              FALLEN WICKETS & RETIREMENTS
+            </Text>
+            {match.battingCard.filter((b) => b.dismissed || b.howOut).map((b) => (
+              <View key={b.name} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 3 }}>
+                <Text style={{ color: '#253129', fontSize: 11, fontWeight: '700' }}>{b.name}</Text>
+                <Text style={{ color: b.howOut === 'retired hurt' ? '#187B62' : '#DC2626', fontSize: 10, fontWeight: '700' }}>
+                  {b.howOut || 'Out'} <Text style={{ color: '#87928A', fontWeight: '500' }}>({b.runs}r, {b.balls}b)</Text>
+                </Text>
+              </View>
+            ))}
           </View>
-        ))}
+        )}
       </View>
-    )}
-    </View>
-    <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 21, marginBottom: 12 }}><Text style={{ color: '#17221D', fontWeight: '800', fontSize: 17 }}>{latestOver && !latestOver.complete ? 'This over' : 'Upcoming over'}</Text><Text style={{ color: '#87928A', fontSize: 11 }}>Bowler  -  {match.bowler.name}</Text></View><View style={{ flexDirection: 'row', alignItems: 'center', gap: 9 }}>{currentOverBalls.length ? currentOverBalls.slice(-6).map((ball, i) => <View key={`${i}-${ball}`} style={{ width: 34, height: 34, borderRadius: 18, borderWidth: 1, borderColor: ball === '4' || ball === '6' ? '#D9EEE4' : '#E8ECE8', backgroundColor: ball === '4' || ball === '6' ? '#E9F4EE' : 'white', alignItems: 'center', justifyContent: 'center' }}><BallResult label={ball} color="#35443B" /></View>) : <Text style={{ color: '#87928A', fontSize: 11 }}>Over about to begin</Text>}<Text style={{ color: '#87928A', fontSize: 10, marginLeft: 3 }}>{match.overs}</Text></View>
-    <View style={{ marginTop: 22 }}><View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 11 }}><Text style={{ color: '#17221D', fontWeight: '800', fontSize: 17 }}>Over history</Text>{history.length > 2 && <Pressable onPress={() => setShowAllOvers((value) => !value)}><Text style={{ color: '#187B62', fontWeight: '700', fontSize: 10 }}>{showAllOvers ? 'Show recent' : 'View all'}</Text></Pressable>}</View>{history.length === 0 ? <View style={{ backgroundColor: '#F3F6F3', borderRadius: 14, padding: 13 }}><Text style={{ color: '#78857C', fontSize: 11 }}>Over-by-over details will appear here as you record balls.</Text></View> : visibleOvers.map((over) => <View key={over.over} style={{ backgroundColor: 'white', borderWidth: 1, borderColor: '#EDF0ED', borderRadius: 15, padding: 12, marginBottom: 8 }}><View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}><Text numberOfLines={1} style={{ flex: 1, color: '#253129', fontSize: 11, fontWeight: '800' }}>OVER {over.over} ({over.bowler}){over.complete ? '' : '  -  IN PROGRESS'}</Text><Text style={{ color: '#526057', fontSize: 10, fontWeight: '700', marginLeft: 8 }}>{over.runs} runs  -  {over.wickets} wickets</Text></View><View style={{ flexDirection: 'row', alignItems: 'center', gap: 7, marginTop: 9 }}>{over.balls.map((ball, index) => <View key={`${over.over}-${index}`} style={{ width: 27, height: 27, borderRadius: 14, alignItems: 'center', justifyContent: 'center', backgroundColor: ball.label === '4' || ball.label === '6' ? '#E9F4EE' : ball.wicket ? '#FCECE8' : '#F2F5F2' }}><BallResult label={ball.label} color={ball.wicket ? '#C6533C' : '#425047'} /></View>)}</View></View>)}</View>    <View style={{ marginTop: 20, borderRadius: 16, padding: 14, backgroundColor: '#F3F6F3', flexDirection: 'row', alignItems: 'center' }}>
-      <View style={{ flex: 1 }}>
-        <Text style={{ color: '#78857C', fontSize: 9, fontWeight: '700' }}>CURRENT BOWLER</Text>
-        <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
-          <Text style={{ color: '#253129', fontWeight: '700', fontSize: 12 }}>{match.bowler.name}</Text>
-          {match.bowler.wickets >= 5 ? (
-            <View style={{ backgroundColor: '#FEE2E2', paddingHorizontal: 5, paddingVertical: 1, borderRadius: 5, marginLeft: 5 }}>
-              <Text style={{ color: '#991B1B', fontSize: 8, fontWeight: '800' }}>💥 5W</Text>
-            </View>
-          ) : match.bowler.wickets >= 3 ? (
-            <View style={{ backgroundColor: '#FFEDD5', paddingHorizontal: 5, paddingVertical: 1, borderRadius: 5, marginLeft: 5 }}>
-              <Text style={{ color: '#9A3412', fontSize: 8, fontWeight: '800' }}>🔥 3W</Text>
-            </View>
-          ) : null}
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 22, marginBottom: 12 }}>
+        <View>
+          <Text style={{ color: '#17221D', fontWeight: '900', fontSize: 17, letterSpacing: -0.3 }}>
+            {latestOver && !latestOver.complete ? 'This Over' : 'Upcoming Over'}
+          </Text>
+          <Text style={{ color: '#78857C', fontSize: 11, marginTop: 1 }}>Bowler • {match.bowler.name}</Text>
+        </View>
+        <View style={{ backgroundColor: '#F3F5F3', paddingHorizontal: 9, paddingVertical: 4, borderRadius: 10 }}>
+          <Text style={{ color: '#526057', fontSize: 11, fontWeight: '800' }}>{match.overs} ov</Text>
         </View>
       </View>
-      <Text style={{ color: '#253129', fontWeight: '800', fontSize: 12 }}>{match.bowler.wickets}/{match.bowler.runs}</Text>
-      <Text style={{ color: '#78857C', fontSize: 10, marginLeft: 7 }}>({match.bowler.overs})</Text>
-    </View>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 9 }}>
+        {currentOverBalls.length ? (
+          currentOverBalls.slice(-6).map((ball, i) => (
+            <DeliveryBall key={`${i}-${ball}`} label={ball} size={36} />
+          ))
+        ) : (
+          <View style={{ backgroundColor: '#F3F5F3', paddingHorizontal: 14, paddingVertical: 10, borderRadius: 14 }}>
+            <Text style={{ color: '#78857C', fontSize: 11, fontWeight: '600' }}>Over about to begin</Text>
+          </View>
+        )}
+      </View>
+      <View style={{ marginTop: 22 }}>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 11 }}>
+          <Text style={{ color: '#17221D', fontWeight: '900', fontSize: 17, letterSpacing: -0.3 }}>Over History</Text>
+          {history.length > 2 && (
+            <Pressable onPress={() => setShowAllOvers((value) => !value)} style={{ paddingVertical: 4, paddingHorizontal: 6 }}>
+              <Text style={{ color: '#187B62', fontWeight: '800', fontSize: 11 }}>
+                {showAllOvers ? 'Show recent' : 'View all'}
+              </Text>
+            </Pressable>
+          )}
+        </View>
+        {history.length === 0 ? (
+          <View style={{ backgroundColor: '#F3F6F3', borderRadius: 16, padding: 14 }}>
+            <Text style={{ color: '#78857C', fontSize: 11 }}>Over-by-over details will appear here as you record balls.</Text>
+          </View>
+        ) : (
+          visibleOvers.map((over) => (
+            <View
+              key={over.over}
+              style={{
+                backgroundColor: 'white',
+                borderWidth: 1,
+                borderColor: '#EDF0ED',
+                borderRadius: 16,
+                padding: 13,
+                marginBottom: 9,
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 1 },
+                shadowOpacity: 0.03,
+                shadowRadius: 3,
+                elevation: 1,
+              }}
+            >
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                <Text numberOfLines={1} style={{ flex: 1, color: '#253129', fontSize: 12, fontWeight: '800' }}>
+                  OVER {over.over} ({over.bowler})
+                  {over.complete ? '' : ' • IN PROGRESS'}
+                </Text>
+                <Text style={{ color: '#526057', fontSize: 11, fontWeight: '800', marginLeft: 8 }}>
+                  {over.runs} runs • {over.wickets} wkts
+                </Text>
+              </View>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7, marginTop: 10 }}>
+                {over.balls.map((ball, index) => (
+                  <DeliveryBall key={`${over.over}-${index}`} label={ball.label} size={28} />
+                ))}
+              </View>
+            </View>
+          ))
+        )}
+      </View>
+      <View style={{ marginTop: 20, borderRadius: 18, padding: 15, backgroundColor: 'white', borderWidth: 1, borderColor: '#EDF0ED', flexDirection: 'row', alignItems: 'center', shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.04, shadowRadius: 4, elevation: 1 }}>
+        <View style={{ width: 40, height: 40, borderRadius: 14, backgroundColor: '#EAF4EF', alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
+          <Ionicons name="baseball-outline" size={20} color="#187B62" />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={{ color: '#78857C', fontSize: 9, fontWeight: '800', letterSpacing: 0.6 }}>CURRENT BOWLER</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2 }}>
+            <Text style={{ color: '#253129', fontWeight: '800', fontSize: 13 }}>{match.bowler.name}</Text>
+            {match.bowler.wickets >= 5 ? (
+              <View style={{ backgroundColor: '#FEE2E2', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, marginLeft: 6 }}>
+                <Text style={{ color: '#991B1B', fontSize: 8, fontWeight: '900' }}>💥 5W</Text>
+              </View>
+            ) : match.bowler.wickets >= 3 ? (
+              <View style={{ backgroundColor: '#FFEDD5', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, marginLeft: 6 }}>
+                <Text style={{ color: '#9A3412', fontSize: 8, fontWeight: '900' }}>🔥 3W</Text>
+              </View>
+            ) : null}
+          </View>
+        </View>
+        <View style={{ alignItems: 'flex-end' }}>
+          <Text style={{ color: '#253129', fontWeight: '900', fontSize: 14 }}>
+            {match.bowler.wickets}/{match.bowler.runs}
+          </Text>
+          <Text style={{ color: '#78857C', fontSize: 10, marginTop: 1, fontWeight: '600' }}>
+            ({match.bowler.overs} ov)
+          </Text>
+        </View>
+      </View>
     {match.inningsNumber === 2 && match.firstInnings && <View style={{ marginTop: 18, borderRadius: 15, padding: 13, backgroundColor: '#EAF3ED' }}><Text style={{ color: '#187B62', fontSize: 9, fontWeight: '800' }}>FIRST INNINGS</Text><Text style={{ color: '#253129', fontSize: 12, fontWeight: '700', marginTop: 5 }}>{match.firstInnings.team}  -  {match.firstInnings.score}/{match.firstInnings.wickets} ({match.firstInnings.overs} ov)</Text>{(match.status === 'AWAITING_END' || match.status === 'COMPLETED') && <Text style={{ color: '#187B62', fontSize: 11, fontWeight: '800', marginTop: 6 }}>{match.result}</Text>}</View>}
     {match.status === 'INNINGS_BREAK' && <View style={{ marginTop: 19, borderRadius: 17, backgroundColor: '#EAF3ED', padding: 15 }}><Text style={{ color: '#187B62', fontSize: 10, fontWeight: '800' }}>FIRST INNINGS COMPLETE</Text><Text style={{ color: '#253129', fontSize: 13, fontWeight: '700', marginTop: 5 }}>{match.home.name} made {match.score}/{match.wickets} in {match.overs} overs.</Text><Text style={{ color: '#536057', fontSize: 11, marginTop: 4 }}>Target for {match.away.name}: {match.target} runs</Text><Pressable onPress={() => setShowSecondInningsSetup(true)} style={{ marginTop: 12, minHeight: 43, borderRadius: 13, backgroundColor: '#187B62', alignItems: 'center', justifyContent: 'center' }}><Text style={{ color: 'white', fontSize: 11, fontWeight: '800' }}>Choose second innings line-up</Text></Pressable></View>}
     </View>
-  </ScrollView><View style={{ backgroundColor: '#FFFFFF', paddingHorizontal: 18, paddingTop: 10, paddingBottom: 12, borderTopWidth: 1, borderTopColor: '#E8ECE8' }}>{match.status === 'LIVE' ? <><View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}><Text style={{ color: '#17221D', fontWeight: '800', fontSize: 16 }}>Scoring controls</Text><View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>{match.batters.length > 1 && (<Pressable onPress={() => onUpdate('swapStrike')} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}><Ionicons name="swap-horizontal" size={14} color="#187B62" /><Text style={{ color: '#187B62', fontSize: 11, fontWeight: '700' }}>Rotate strike</Text></Pressable>)}<Pressable onPress={() => onUpdate('undo')} style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}><Ionicons name="arrow-undo" size={14} color="#187B62" /><Text style={{ color: '#187B62', fontSize: 11, fontWeight: '700' }}>Undo</Text></Pressable></View></View>      <View style={{ flexDirection: 'row', gap: 8, marginTop: 10 }}>
-        {[0, 1, 2, 3, 4, 6].map((runs) => {
-          const isSolo = match.batters?.length === 1;
-          const disabled = isSolo && (runs === 1 || runs === 3);
-          return (
+  </ScrollView>
+  <View style={{ backgroundColor: '#FFFFFF', paddingHorizontal: 16, paddingTop: 12, paddingBottom: Platform.OS === 'ios' ? 24 : 14, borderTopWidth: 1, borderTopColor: '#E8ECE8', shadowColor: '#000', shadowOffset: { width: 0, height: -4 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 8 }}>
+    {match.status === 'LIVE' ? (
+      <>
+        {/* Controls Header */}
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#187B62' }} />
+            <Text style={{ color: '#17221D', fontWeight: '900', fontSize: 14, letterSpacing: -0.2 }}>
+              Scoring Keypad
+            </Text>
+          </View>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            {match.batters.length > 1 && (
+              <Pressable
+                onPress={() => onUpdate('swapStrike')}
+                style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#EAF4EF', paddingHorizontal: 9, paddingVertical: 5, borderRadius: 10, borderWidth: 1, borderColor: '#D0E6DB' }}
+              >
+                <Ionicons name="swap-horizontal" size={13} color="#187B62" />
+                <Text style={{ color: '#187B62', fontSize: 11, fontWeight: '800' }}>Rotate strike</Text>
+              </Pressable>
+            )}
             <Pressable
-              key={runs}
-              disabled={disabled}
+              onPress={() => onUpdate('undo')}
+              style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#F3F5F4', paddingHorizontal: 9, paddingVertical: 5, borderRadius: 10, borderWidth: 1, borderColor: '#E2E6E3' }}
+            >
+              <Ionicons name="arrow-undo" size={13} color="#526057" />
+              <Text style={{ color: '#526057', fontSize: 11, fontWeight: '800' }}>Undo</Text>
+            </Pressable>
+          </View>
+        </View>
+
+        {/* Runs Numbers Row */}
+        <View style={{ flexDirection: 'row', gap: 7 }}>
+          {[0, 1, 2, 3, 4, 6].map((runs) => {
+            const isSolo = match.batters?.length === 1;
+            const disabled = isSolo && (runs === 1 || runs === 3);
+            const isFour = runs === 4;
+            const isSix = runs === 6;
+            return (
+              <Pressable
+                key={runs}
+                disabled={disabled}
+                onPress={() => {
+                  if (runs === 4 || runs === 6) {
+                    setShotPrompt({ runs });
+                  } else {
+                    onUpdate(runs);
+                  }
+                }}
+                style={{
+                  flex: 1,
+                  height: 46,
+                  borderRadius: 14,
+                  backgroundColor: disabled
+                    ? '#F3F5F4'
+                    : isFour
+                    ? '#10B981'
+                    : isSix
+                    ? '#6366F1'
+                    : 'white',
+                  borderWidth: disabled ? 1 : isFour || isSix ? 0 : 1.5,
+                  borderColor: disabled ? '#E2E6E3' : '#E6EBE7',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  opacity: disabled ? 0.35 : 1,
+                  shadowColor: isFour ? '#10B981' : isSix ? '#6366F1' : '#000',
+                  shadowOffset: { width: 0, height: 2 },
+                  shadowOpacity: isFour || isSix ? 0.3 : 0.05,
+                  shadowRadius: 3,
+                  elevation: isFour || isSix ? 3 : 1,
+                }}
+              >
+                <Text
+                  style={{
+                    color: disabled
+                      ? '#8E9B92'
+                      : isFour || isSix
+                      ? 'white'
+                      : '#1F2937',
+                    fontSize: 17,
+                    fontWeight: '900',
+                    textDecorationLine: disabled ? 'line-through' : 'none',
+                  }}
+                >
+                  {runs}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+
+        {/* Solo Batter Hint */}
+        {match.batters?.length === 1 && (
+          <View style={{ marginTop: 6, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 5, backgroundColor: '#FEF3C7', paddingVertical: 4, borderRadius: 8 }}>
+            <Ionicons name="information-circle" size={13} color="#92400E" />
+            <Text style={{ color: '#92400E', fontSize: 10, fontWeight: '800' }}>
+              1 & 3 runs disabled for solo batter (Gully Cricket)
+            </Text>
+          </View>
+        )}
+
+        {/* Actions Row */}
+        <View style={{ flexDirection: 'row', gap: 7, marginTop: 8 }}>
+          {[
+            { label: 'Wicket', icon: 'flash', bg: '#FEE2E2', border: '#FCA5A5', text: '#DC2626' },
+            { label: 'Wide', icon: 'swap-horizontal', bg: '#FEF3C7', border: '#FCD34D', text: '#B45309' },
+            { label: 'No ball', icon: 'alert-circle', bg: '#FFEDD5', border: '#FDBA74', text: '#C2410C' },
+            { label: 'Retire', icon: 'exit-outline', bg: '#F3F4F6', border: '#E5E7EB', text: '#4B5563' },
+          ].map((btn) => (
+            <Pressable
+              key={btn.label}
               onPress={() => {
-                if (runs === 4 || runs === 6) {
-                  setShotPrompt({ runs });
-                } else {
-                  onUpdate(runs);
-                }
+                if (btn.label === 'Wicket') setShowWicketModal(true);
+                else if (btn.label === 'No ball') setShowNoBallModal(true);
+                else if (btn.label === 'Retire') setShowRetireModal(true);
+                else onUpdate(btn.label);
               }}
               style={{
                 flex: 1,
-                height: 42,
+                paddingVertical: 10,
                 borderRadius: 13,
-                backgroundColor: disabled
-                  ? '#F2F4F2'
-                  : runs === 4 || runs === 6
-                  ? '#187B62'
-                  : 'white',
-                borderWidth: disabled ? 1 : runs === 4 || runs === 6 ? 0 : 1,
-                borderColor: disabled ? '#E2E6E3' : '#E6EBE7',
+                backgroundColor: btn.bg,
+                borderWidth: 1.5,
+                borderColor: btn.border,
                 alignItems: 'center',
                 justifyContent: 'center',
-                opacity: disabled ? 0.35 : 1,
+                flexDirection: 'row',
+                gap: 4,
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 1 },
+                shadowOpacity: 0.05,
+                shadowRadius: 2,
+                elevation: 1,
               }}
             >
-              <Text
-                style={{
-                  color: disabled
-                    ? '#8E9B92'
-                    : runs === 4 || runs === 6
-                    ? 'white'
-                    : '#253129',
-                  fontSize: 15,
-                  fontWeight: '800',
-                  textDecorationLine: disabled ? 'line-through' : 'none',
-                }}
-              >
-                {runs}
-              </Text>
+              <Ionicons name={btn.icon} size={13} color={btn.text} />
+              <Text style={{ color: btn.text, fontWeight: '900', fontSize: 11 }}>{btn.label}</Text>
             </Pressable>
-          );
-        })}
-      </View>
-      {match.batters?.length === 1 && (
-        <View style={{ marginTop: 6, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4 }}>
-          <Ionicons name="information-circle-outline" size={13} color="#92400E" />
-          <Text style={{ color: '#92400E', fontSize: 10, fontWeight: '700' }}>
-            1 & 3 runs disabled for solo batter
-          </Text>
+          ))}
         </View>
-      )}<View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
-  {[
-    { label: 'Wicket', bg: '#FCECE8', border: '#F4D2C9', text: '#C6533C' },
-    { label: 'Wide', bg: '#F2F5F2', border: '#E4ECE5', text: '#3E4E44' },
-    { label: 'No ball', bg: '#FEF5E7', border: '#FCE2B6', text: '#B86200' },
-    { label: 'Retire', bg: '#EDEFEA', border: '#D5DDD7', text: '#3E4E44' },
-  ].map((btn) => (
-    <Pressable
-      key={btn.label}
-      onPress={() => {
-        if (btn.label === 'Wicket') setShowWicketModal(true);
-        else if (btn.label === 'No ball') setShowNoBallModal(true);
-        else if (btn.label === 'Retire') setShowRetireModal(true);
-        else onUpdate(btn.label);
-      }}
-      style={{
-        flex: 1,
-        paddingVertical: 10,
-        borderRadius: 12,
-        backgroundColor: btn.bg,
-        borderWidth: 1,
-        borderColor: btn.border,
-        alignItems: 'center',
-        justifyContent: 'center',
-      }}
-    >
-      <Text style={{ fontSize: 11, color: btn.text, fontWeight: '800' }}>
-        {btn.label}
-      </Text>
-    </Pressable>
-  ))}
-</View></> : match.status === 'INNINGS_BREAK' ? <View style={{ gap: 8 }}><View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}><Text style={{ color: '#17221D', fontWeight: '800', fontSize: 15 }}>Innings break</Text><Pressable onPress={() => onUpdate('undo')} style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}><Ionicons name="arrow-undo" size={14} color="#187B62" /><Text style={{ color: '#187B62', fontSize: 11, fontWeight: '700' }}>Undo last ball</Text></Pressable></View><Pressable onPress={() => setShowSecondInningsSetup(true)} style={{ minHeight: 46, borderRadius: 14, backgroundColor: '#187B62', alignItems: 'center', justifyContent: 'center' }}><Text style={{ color: 'white', fontSize: 12, fontWeight: '800' }}>Set up second innings</Text></Pressable></View> : match.status === 'AWAITING_END' ? (() => {
+      </>
+    ) : match.status === 'INNINGS_BREAK' ? <View style={{ gap: 8 }}><View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}><Text style={{ color: '#17221D', fontWeight: '800', fontSize: 15 }}>Innings break</Text><Pressable onPress={() => onUpdate('undo')} style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}><Ionicons name="arrow-undo" size={14} color="#187B62" /><Text style={{ color: '#187B62', fontSize: 11, fontWeight: '700' }}>Undo last ball</Text></Pressable></View><Pressable onPress={() => setShowSecondInningsSetup(true)} style={{ minHeight: 46, borderRadius: 14, backgroundColor: '#187B62', alignItems: 'center', justifyContent: 'center' }}><Text style={{ color: 'white', fontSize: 12, fontWeight: '800' }}>Set up second innings</Text></Pressable></View> : match.status === 'AWAITING_END' ? (() => {
   const potmCalc = calculatePlayerOfMatch(match);
   const potmName = match.playerOfMatch || potmCalc?.bestPlayer?.name || 'Player of the match';
   const potmSummary = match.potmSummary || potmCalc?.bestPlayer?.summary || 'Match winning performance';
