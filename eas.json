@@ -1,4 +1,4 @@
-﻿{
+{
     "cli":  {
                 "version":  "\u003e= 16.0.0",
                 "appVersionSource":  "remote"

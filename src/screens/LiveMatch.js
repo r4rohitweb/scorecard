@@ -5,6 +5,15 @@ import { LinearGradient } from '../theme/native';
 import { getTeam } from '../data/mockData';
 import { Pill, TeamMark, DeliveryBall } from '../components/UI';
 import { calculatePlayerOfMatch, generateWhatsAppSummary } from '../data/statsHelper';
+import {
+  CommentarySettings,
+  loadCommentarySettings,
+  saveCommentarySettings,
+  playSound,
+  generateCommentaryPhrase,
+  speakCommentary,
+  stopSpeaking,
+} from '../services/audioCommentary';
 
 function Stat({ label, value, sub }) {
   return (
@@ -833,6 +842,191 @@ function VictoryCelebrationModal({ visible, match, onClose, onEndMatch }) {
   );
 }
 
+function CommentaryModal({ visible, onClose, settings, onUpdateSettings }) {
+  if (!visible) return null;
+
+  const testVoice = () => {
+    playSound('six');
+    const sample = settings.language === 'hi'
+      ? 'Chakka! Rohit ne mara shaandaar six! Live commentary active hai!'
+      : 'Six! Rohit launches it into the stands! Live commentary is active!';
+    speakCommentary(sample, { language: settings.language });
+  };
+
+  return (
+    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+      <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.55)', justifyContent: 'flex-end' }}>
+        <View style={{ backgroundColor: 'white', borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 22, maxHeight: '85%' }}>
+          {/* Header */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 18 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+              <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: '#EAF4EF', alignItems: 'center', justifyContent: 'center' }}>
+                <Ionicons name="mic" size={22} color="#187B62" />
+              </View>
+              <View>
+                <Text style={{ fontSize: 17, fontWeight: '900', color: '#17221D' }}>Audio Commentary & SFX</Text>
+                <Text style={{ fontSize: 11, color: '#78857C', marginTop: 1 }}>Live voice announcements & match sounds</Text>
+              </View>
+            </View>
+            <Pressable onPress={onClose} style={{ width: 34, height: 34, borderRadius: 17, backgroundColor: '#F3F5F4', alignItems: 'center', justifyContent: 'center' }}>
+              <Ionicons name="close" size={18} color="#526057" />
+            </Pressable>
+          </View>
+
+          {/* Voice Commentary Toggle */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 14, borderBottomWidth: 1, borderColor: '#EDF1EE' }}>
+            <View style={{ flex: 1, paddingRight: 12 }}>
+              <Text style={{ fontSize: 14, fontWeight: '800', color: '#17221D' }}>🎙️ Voice Commentary</Text>
+              <Text style={{ fontSize: 11, color: '#78857C', marginTop: 2 }}>Speaks ball-by-ball score, boundaries & wickets</Text>
+            </View>
+            <Pressable
+              onPress={() => onUpdateSettings({ voiceEnabled: !settings.voiceEnabled })}
+              style={{
+                width: 48,
+                height: 28,
+                borderRadius: 14,
+                backgroundColor: settings.voiceEnabled ? '#187B62' : '#D1D5DB',
+                justifyContent: 'center',
+                paddingHorizontal: 3,
+              }}
+            >
+              <View style={{
+                width: 22,
+                height: 22,
+                borderRadius: 11,
+                backgroundColor: 'white',
+                alignSelf: settings.voiceEnabled ? 'flex-end' : 'flex-start',
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 1 },
+                shadowOpacity: 0.2,
+                shadowRadius: 1.5,
+                elevation: 2,
+              }} />
+            </Pressable>
+          </View>
+
+          {/* Sound Effects Toggle */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 14, borderBottomWidth: 1, borderColor: '#EDF1EE' }}>
+            <View style={{ flex: 1, paddingRight: 12 }}>
+              <Text style={{ fontSize: 14, fontWeight: '800', color: '#17221D' }}>🔊 Match Sound Effects</Text>
+              <Text style={{ fontSize: 11, color: '#78857C', marginTop: 2 }}>Crisp bat crack, crowd cheers & umpire whistles</Text>
+            </View>
+            <Pressable
+              onPress={() => onUpdateSettings({ soundEffectsEnabled: !settings.soundEffectsEnabled })}
+              style={{
+                width: 48,
+                height: 28,
+                borderRadius: 14,
+                backgroundColor: settings.soundEffectsEnabled ? '#187B62' : '#D1D5DB',
+                justifyContent: 'center',
+                paddingHorizontal: 3,
+              }}
+            >
+              <View style={{
+                width: 22,
+                height: 22,
+                borderRadius: 11,
+                backgroundColor: 'white',
+                alignSelf: settings.soundEffectsEnabled ? 'flex-end' : 'flex-start',
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 1 },
+                shadowOpacity: 0.2,
+                shadowRadius: 1.5,
+                elevation: 2,
+              }} />
+            </Pressable>
+          </View>
+
+          {/* Commentary Language */}
+          <View style={{ paddingVertical: 14, borderBottomWidth: 1, borderColor: '#EDF1EE' }}>
+            <Text style={{ fontSize: 14, fontWeight: '800', color: '#17221D', marginBottom: 4 }}>
+              🌐 Commentary Language
+            </Text>
+            <Text style={{ fontSize: 11, color: '#78857C', marginBottom: 12 }}>
+              Choose your commentary tone & dialect
+            </Text>
+            <View style={{ flexDirection: 'row', gap: 10 }}>
+              <Pressable
+                onPress={() => onUpdateSettings({ language: 'hi' })}
+                style={{
+                  flex: 1,
+                  paddingVertical: 12,
+                  paddingHorizontal: 12,
+                  borderRadius: 14,
+                  backgroundColor: settings.language === 'hi' ? '#EAF4EF' : '#F8F9F8',
+                  borderWidth: 1.5,
+                  borderColor: settings.language === 'hi' ? '#187B62' : '#E2E6E3',
+                  alignItems: 'center',
+                }}
+              >
+                <Text style={{ fontSize: 13, fontWeight: '800', color: settings.language === 'hi' ? '#187B62' : '#4B5563' }}>
+                  🇮🇳 Hindi / Hinglish
+                </Text>
+                <Text style={{ fontSize: 10, color: '#78857C', marginTop: 2 }}>"Chauka! Shaandaar shot!"</Text>
+              </Pressable>
+
+              <Pressable
+                onPress={() => onUpdateSettings({ language: 'en' })}
+                style={{
+                  flex: 1,
+                  paddingVertical: 12,
+                  paddingHorizontal: 12,
+                  borderRadius: 14,
+                  backgroundColor: settings.language === 'en' ? '#EAF4EF' : '#F8F9F8',
+                  borderWidth: 1.5,
+                  borderColor: settings.language === 'en' ? '#187B62' : '#E2E6E3',
+                  alignItems: 'center',
+                }}
+              >
+                <Text style={{ fontSize: 13, fontWeight: '800', color: settings.language === 'en' ? '#187B62' : '#4B5563' }}>
+                  🇬🇧 English
+                </Text>
+                <Text style={{ fontSize: 10, color: '#78857C', marginTop: 2 }}>"Four! Driven crisply!"</Text>
+              </Pressable>
+            </View>
+          </View>
+
+          {/* Test Voice & Done Buttons */}
+          <View style={{ flexDirection: 'row', gap: 10, marginTop: 18 }}>
+            <Pressable
+              onPress={testVoice}
+              style={{
+                flex: 1,
+                height: 48,
+                borderRadius: 14,
+                backgroundColor: '#F3F5F4',
+                borderWidth: 1,
+                borderColor: '#D8DDD9',
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 6,
+              }}
+            >
+              <Ionicons name="volume-high" size={17} color="#17221D" />
+              <Text style={{ color: '#17221D', fontSize: 12, fontWeight: '800' }}>Test Voice</Text>
+            </Pressable>
+
+            <Pressable
+              onPress={onClose}
+              style={{
+                flex: 1,
+                height: 48,
+                borderRadius: 14,
+                backgroundColor: '#187B62',
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+            >
+              <Text style={{ color: 'white', fontSize: 13, fontWeight: '800' }}>Done</Text>
+            </Pressable>
+          </View>
+        </View>
+      </View>
+    </Modal>
+  );
+}
+
 export default function LiveMatch({ match, onBack, onUpdate, onSelectBatter, onSelectBowler, onStartSecondInnings, onEndMatch }) {
   const [showWicketModal, setShowWicketModal] = useState(false);
   const [showNoBallModal, setShowNoBallModal] = useState(false);
@@ -841,12 +1035,123 @@ export default function LiveMatch({ match, onBack, onUpdate, onSelectBatter, onS
   const [showVictoryModal, setShowVictoryModal] = useState(false);
   const [showSecondInningsSetup, setShowSecondInningsSetup] = useState(false);
   const [showPlayerOfMatch, setShowPlayerOfMatch] = useState(false);
+  const [commentarySettings, setCommentarySettings] = useState(CommentarySettings);
+  const [showCommentaryModal, setShowCommentaryModal] = useState(false);
+  const [latestCommentary, setLatestCommentary] = useState('');
+
+  React.useEffect(() => {
+    loadCommentarySettings().then(setCommentarySettings);
+  }, []);
+
+  const updateSettings = async (partial) => {
+    const next = await saveCommentarySettings(partial);
+    setCommentarySettings({ ...next });
+  };
 
   React.useEffect(() => {
     if (match.status === 'AWAITING_END') {
       setShowVictoryModal(true);
+      playSound('victory');
+      const phrase = generateCommentaryPhrase({
+        type: 'victory',
+        winningTeam: match.result?.split(' won')?.[0] || 'Winner',
+        margin: match.result?.split('by ')?.[1] || '',
+        language: commentarySettings.language,
+      });
+      if (phrase) {
+        setLatestCommentary(phrase);
+        speakCommentary(phrase, { language: commentarySettings.language });
+      }
     }
   }, [match.status]);
+
+  const handleScore = (action) => {
+    const striker = match.batters?.find((b) => b.onStrike) || match.batters?.[0];
+    const strikerName = striker?.name || 'Batter';
+    const bowlerName = match.bowler?.name || 'Bowler';
+    const strikerRuns = striker?.runs || 0;
+
+    let soundType = 'batHit';
+    let commentaryType = 'run';
+    let runs = 0;
+    let shotDir = null;
+    let howOut = null;
+    let milestone = null;
+
+    if (typeof action === 'number') {
+      runs = action;
+      if (runs === 4) soundType = 'four';
+      else if (runs === 6) soundType = 'six';
+      else soundType = 'batHit';
+
+      if (strikerRuns < 50 && strikerRuns + runs >= 50) milestone = 50;
+      else if (strikerRuns < 100 && strikerRuns + runs >= 100) milestone = 100;
+    } else if (typeof action === 'object') {
+      if (action.type === 'Run') {
+        runs = action.runs || 0;
+        shotDir = action.shotDirection;
+        if (runs === 4) soundType = 'four';
+        else if (runs === 6) soundType = 'six';
+        else soundType = 'batHit';
+
+        if (strikerRuns < 50 && strikerRuns + runs >= 50) milestone = 50;
+        else if (strikerRuns < 100 && strikerRuns + runs >= 100) milestone = 100;
+      } else if (action.type === 'Wicket') {
+        soundType = 'wicket';
+        commentaryType = 'wicket';
+        howOut = action.dismissalType || 'out';
+      } else if (action.type === 'Retire') {
+        soundType = 'batHit';
+        commentaryType = 'retire';
+      } else if (action.type === 'NoBall') {
+        soundType = 'noBall';
+        commentaryType = 'noBall';
+      }
+    } else if (action === 'Wide') {
+      soundType = 'wide';
+      commentaryType = 'wide';
+    } else if (action === 'No ball') {
+      soundType = 'noBall';
+      commentaryType = 'noBall';
+    } else if (action === 'undo') {
+      stopSpeaking();
+      onUpdate(action);
+      return;
+    } else if (action === 'swapStrike') {
+      onUpdate(action);
+      return;
+    }
+
+    playSound(soundType);
+
+    let phrase = '';
+    if (milestone) {
+      phrase = generateCommentaryPhrase({
+        type: 'milestone',
+        milestone,
+        strikerName,
+        language: commentarySettings.language,
+      });
+      setTimeout(() => playSound('fanfare'), 220);
+    } else {
+      phrase = generateCommentaryPhrase({
+        type: commentaryType,
+        runs,
+        shotDirection: shotDir,
+        strikerName,
+        bowlerName,
+        howOut,
+        language: commentarySettings.language,
+      });
+    }
+
+    if (phrase) {
+      setLatestCommentary(phrase);
+      speakCommentary(phrase, { language: commentarySettings.language });
+    }
+
+    onUpdate(action);
+  };
   const batting = getTeam(match.home); const bowling = getTeam(match.away);  const [showAllOvers, setShowAllOvers] = useState(false);
   const history = match.overHistory || [];
   const latestOver = history[history.length - 1];
@@ -878,12 +1183,38 @@ export default function LiveMatch({ match, onBack, onUpdate, onSelectBatter, onS
           </Text>
         </View>
 
-        <Pressable
-          onPress={() => shareToWhatsApp(generateWhatsAppSummary(match))}
-          style={{ width: 38, height: 38, borderRadius: 14, backgroundColor: 'rgba(37, 211, 102, 0.2)', borderWidth: 1, borderColor: 'rgba(37, 211, 102, 0.4)', alignItems: 'center', justifyContent: 'center' }}
-        >
-          <Ionicons name="logo-whatsapp" size={19} color="#25D366" />
-        </Pressable>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 7 }}>
+          <Pressable
+            onPress={() => setShowCommentaryModal(true)}
+            style={{
+              height: 38,
+              paddingHorizontal: 9,
+              borderRadius: 14,
+              backgroundColor: commentarySettings.voiceEnabled ? 'rgba(74, 222, 128, 0.22)' : 'rgba(255, 255, 255, 0.12)',
+              borderWidth: 1,
+              borderColor: commentarySettings.voiceEnabled ? '#4ADE80' : 'rgba(255, 255, 255, 0.2)',
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 4,
+            }}
+          >
+            <Ionicons
+              name={commentarySettings.voiceEnabled ? 'mic' : commentarySettings.soundEffectsEnabled ? 'volume-medium' : 'volume-mute'}
+              size={15}
+              color={commentarySettings.voiceEnabled ? '#4ADE80' : '#E2ECE6'}
+            />
+            <Text style={{ color: 'white', fontSize: 10, fontWeight: '900' }}>
+              {commentarySettings.language.toUpperCase()}
+            </Text>
+          </Pressable>
+
+          <Pressable
+            onPress={() => shareToWhatsApp(generateWhatsAppSummary(match))}
+            style={{ width: 38, height: 38, borderRadius: 14, backgroundColor: 'rgba(37, 211, 102, 0.2)', borderWidth: 1, borderColor: 'rgba(37, 211, 102, 0.4)', alignItems: 'center', justifyContent: 'center' }}
+          >
+            <Ionicons name="logo-whatsapp" size={19} color="#25D366" />
+          </Pressable>
+        </View>
       </View>
 
       <Text style={{ color: '#8FB4A4', fontSize: 10, letterSpacing: 1.1, fontWeight: '800', textAlign: 'center' }}>
@@ -1234,6 +1565,40 @@ export default function LiveMatch({ match, onBack, onUpdate, onSelectBatter, onS
   <View style={{ backgroundColor: '#FFFFFF', paddingHorizontal: 16, paddingTop: 12, paddingBottom: Platform.OS === 'ios' ? 24 : 14, borderTopWidth: 1, borderTopColor: '#E8ECE8', shadowColor: '#000', shadowOffset: { width: 0, height: -4 }, shadowOpacity: 0.05, shadowRadius: 8, elevation: 8 }}>
     {match.status === 'LIVE' ? (
       <>
+        {/* Live Commentary Ticker Banner */}
+        {latestCommentary ? (
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              backgroundColor: '#F0F9F5',
+              borderWidth: 1,
+              borderColor: '#C6E7D8',
+              borderRadius: 12,
+              paddingHorizontal: 10,
+              paddingVertical: 7,
+              marginBottom: 10,
+              gap: 8,
+            }}
+          >
+            <View style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: '#187B62', alignItems: 'center', justifyContent: 'center' }}>
+              <Ionicons name="mic" size={12} color="white" />
+            </View>
+            <Text numberOfLines={1} style={{ flex: 1, color: '#134E3F', fontSize: 11, fontWeight: '700' }}>
+              {latestCommentary}
+            </Text>
+            <Pressable
+              onPress={() => {
+                stopSpeaking();
+                speakCommentary(latestCommentary, { language: commentarySettings.language });
+              }}
+              style={{ padding: 2 }}
+            >
+              <Ionicons name="volume-medium" size={16} color="#187B62" />
+            </Pressable>
+          </View>
+        ) : null}
+
         {/* Controls Header */}
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
@@ -1245,7 +1610,7 @@ export default function LiveMatch({ match, onBack, onUpdate, onSelectBatter, onS
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
             {match.batters.length > 1 && (
               <Pressable
-                onPress={() => onUpdate('swapStrike')}
+                onPress={() => handleScore('swapStrike')}
                 style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#EAF4EF', paddingHorizontal: 9, paddingVertical: 5, borderRadius: 10, borderWidth: 1, borderColor: '#D0E6DB' }}
               >
                 <Ionicons name="swap-horizontal" size={13} color="#187B62" />
@@ -1253,7 +1618,7 @@ export default function LiveMatch({ match, onBack, onUpdate, onSelectBatter, onS
               </Pressable>
             )}
             <Pressable
-              onPress={() => onUpdate('undo')}
+              onPress={() => handleScore('undo')}
               style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#F3F5F4', paddingHorizontal: 9, paddingVertical: 5, borderRadius: 10, borderWidth: 1, borderColor: '#E2E6E3' }}
             >
               <Ionicons name="arrow-undo" size={13} color="#526057" />
@@ -1277,7 +1642,7 @@ export default function LiveMatch({ match, onBack, onUpdate, onSelectBatter, onS
                   if (runs === 4 || runs === 6) {
                     setShotPrompt({ runs });
                   } else {
-                    onUpdate(runs);
+                    handleScore(runs);
                   }
                 }}
                 style={{
@@ -1346,7 +1711,7 @@ export default function LiveMatch({ match, onBack, onUpdate, onSelectBatter, onS
                 if (btn.label === 'Wicket') setShowWicketModal(true);
                 else if (btn.label === 'No ball') setShowNoBallModal(true);
                 else if (btn.label === 'Retire') setShowRetireModal(true);
-                else onUpdate(btn.label);
+                else handleScore(btn.label);
               }}
               style={{
                 flex: 1,
@@ -1437,11 +1802,12 @@ export default function LiveMatch({ match, onBack, onUpdate, onSelectBatter, onS
     </View>
   );
 })() : <View style={{ minHeight: 40, alignItems: 'center', justifyContent: 'center' }}><Text style={{ color: '#187B62', fontSize: 12, fontWeight: '800' }}>{match.result}</Text></View>}</View>
-    <WicketModal visible={showWicketModal} match={match} onClose={() => setShowWicketModal(false)} onConfirm={onUpdate} />
-    <NoBallModal visible={showNoBallModal} match={match} onClose={() => setShowNoBallModal(false)} onConfirm={onUpdate} />
-    <RetireModal visible={showRetireModal} match={match} onClose={() => setShowRetireModal(false)} onConfirm={onUpdate} />
-    <ShotDirectionModal visible={Boolean(shotPrompt)} runs={shotPrompt?.runs} onClose={() => setShotPrompt(null)} onSelect={(dir) => { if (dir) { onUpdate({ type: 'Run', runs: shotPrompt.runs, shotDirection: dir }); } else { onUpdate(shotPrompt.runs); } setShotPrompt(null); }} />
+    <WicketModal visible={showWicketModal} match={match} onClose={() => setShowWicketModal(false)} onConfirm={handleScore} />
+    <NoBallModal visible={showNoBallModal} match={match} onClose={() => setShowNoBallModal(false)} onConfirm={handleScore} />
+    <RetireModal visible={showRetireModal} match={match} onClose={() => setShowRetireModal(false)} onConfirm={handleScore} />
+    <ShotDirectionModal visible={Boolean(shotPrompt)} runs={shotPrompt?.runs} onClose={() => setShotPrompt(null)} onSelect={(dir) => { if (dir) { handleScore({ type: 'Run', runs: shotPrompt.runs, shotDirection: dir }); } else { handleScore(shotPrompt.runs); } setShotPrompt(null); }} />
     <VictoryCelebrationModal visible={showVictoryModal} match={match} onClose={() => setShowVictoryModal(false)} onEndMatch={(p) => { setShowVictoryModal(false); onEndMatch(p); }} />
+    <CommentaryModal visible={showCommentaryModal} onClose={() => setShowCommentaryModal(false)} settings={commentarySettings} onUpdateSettings={updateSettings} />
     <PlayerPrompt visible={Boolean(match.pendingBatterSelection)} title="Choose next batter" subtitle="Select who will take the striker's end." players={availableBatters} color={batting.color} onSelect={onSelectBatter} />
     <PlayerPrompt visible={Boolean(match.pendingBowlerSelection && !match.pendingBatterSelection)} title="Choose next bowler" subtitle={`Over complete. Select a bowler for ${bowling.name}.`} players={availableBowlers} color={bowling.color} stats={match.bowlingStats} onSelect={onSelectBowler} />
     <PlayerPrompt visible={showPlayerOfMatch} title="Choose Player of the Match" subtitle={match.result || 'Select the standout player.'} players={[...new Set([...(match.battingPlayers || []), ...(match.bowlingPlayers || [])])]} color="#187B62" onSelect={(player) => { setShowPlayerOfMatch(false); onEndMatch(player); }} />

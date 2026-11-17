@@ -1161,6 +1161,86 @@ it('TEST 26: Gully Cricket - Team is all-out only when all N wickets fall with l
   assert.strictEqual(stdWicket.item.status, 'INNINGS_BREAK', 'Standard cricket is all out at N-1 (3 wickets)');
 });
 
+it('TEST 27: Audio Commentary phrase generator for Hindi & English ball outcomes', () => {
+  const { generateCommentaryPhrase } = require('../src/services/audioCommentary');
+
+  // Hindi Six
+  const sixHi = generateCommentaryPhrase({
+    type: 'run',
+    runs: 6,
+    shotDirection: 'Long On',
+    strikerName: 'Rohit',
+    language: 'hi',
+  });
+  assert(sixHi.includes('Rohit') && (sixHi.includes('six') || sixHi.includes('Chakka') || sixHi.includes('Chhakka')), 'Hindi six phrase contains batter and boundary keyword');
+
+  // English Four
+  const fourEn = generateCommentaryPhrase({
+    type: 'run',
+    runs: 4,
+    shotDirection: 'Cover',
+    strikerName: 'Virat',
+    language: 'en',
+  });
+  assert(fourEn.includes('Virat') && (fourEn.includes('Four') || fourEn.includes('boundary') || fourEn.includes('Boundary')), 'English four phrase contains batter and boundary');
+
+  // Wicket Hindi
+  const wktHi = generateCommentaryPhrase({
+    type: 'wicket',
+    strikerName: 'Gill',
+    bowlerName: 'Bumrah',
+    howOut: 'Bowled',
+    language: 'hi',
+  });
+  assert(wktHi.includes('Gill') && wktHi.includes('Bumrah'), 'Hindi wicket phrase includes batter and bowler');
+
+  // Extras
+  const wideHi = generateCommentaryPhrase({ type: 'wide', language: 'hi' });
+  assert(wideHi.toLowerCase().includes('wide'), 'Wide commentary generated');
+
+  const noBallEn = generateCommentaryPhrase({ type: 'noBall', language: 'en' });
+  assert(noBallEn.toLowerCase().includes('no ball'), 'No ball commentary generated');
+});
+
+it('TEST 28: Milestones (50/100) and Match Victory commentary announcements', () => {
+  const { generateCommentaryPhrase } = require('../src/services/audioCommentary');
+
+  // 50 milestone in Hindi
+  const fiftyHi = generateCommentaryPhrase({
+    type: 'milestone',
+    milestone: 50,
+    strikerName: 'Hardik',
+    language: 'hi',
+  });
+  assert(fiftyHi.includes('Hardik') && fiftyHi.includes('half-century'), 'Hindi 50 announcement includes batter');
+
+  // 100 milestone in English
+  const tonEn = generateCommentaryPhrase({
+    type: 'milestone',
+    milestone: 100,
+    strikerName: 'Rohit',
+    language: 'en',
+  });
+  assert(tonEn.includes('Rohit') && tonEn.includes('Century'), 'English century announcement includes batter');
+
+  // Victory in Hindi & English
+  const winHi = generateCommentaryPhrase({
+    type: 'victory',
+    winningTeam: 'Mumbai Masters',
+    margin: '14 runs',
+    language: 'hi',
+  });
+  assert(winHi.includes('Mumbai Masters') && winHi.includes('14 runs'), 'Hindi victory announcement formatted');
+
+  const winEn = generateCommentaryPhrase({
+    type: 'victory',
+    winningTeam: 'Delhi Dynamos',
+    margin: '6 wickets',
+    language: 'en',
+  });
+  assert(winEn.includes('Delhi Dynamos') && winEn.includes('6 wickets'), 'English victory announcement formatted');
+});
+
 console.log(`\nResults: ${passed} / ${total} tests passed.\n`);
 if (passed === total) {
   console.log('ALL TESTS PASSED SUCCESSFULLY!\n');
