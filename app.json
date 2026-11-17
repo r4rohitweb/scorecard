@@ -31,6 +31,12 @@
       }
     },
     "owner": "ro_hit_dev2512",
-    "icon": "./assets/app-icon.png"
+    "icon": "./assets/app-icon.png",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/cc2837ad-ef2f-4452-88e2-1db9a810c56d"
+    }
   }
 }
