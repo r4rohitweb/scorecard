@@ -35,9 +35,17 @@ function AppContent() {
   const [undoHistory, setUndoHistory] = useState([]);
   const [toast, setToast] = useState('');
   const [signedIn, setSignedIn] = useState(true);
+  const [milestoneCelebration, setMilestoneCelebration] = useState(null);
 
   const [allPlayers, setAllPlayers] = useState(() => initialPlayers);
   const [playersHydrated, setPlayersHydrated] = useState(false);
+
+  useEffect(() => {
+    if (milestoneCelebration) {
+      const timer = setTimeout(() => setMilestoneCelebration(null), 4000);
+      return () => clearTimeout(timer);
+    }
+  }, [milestoneCelebration]);
 
   useEffect(() => {
     AsyncStorage.getItem('pitch-cricket-players-v1').then((stored) => {
@@ -164,6 +172,137 @@ function AppContent() {
       setTimeout(() => setToast(''), 2000);
       return;
     }
+    if (typeof event === 'object' && event?.type === 'Retire') {
+      const reason = event.reason || 'retired hurt';
+      const isOut = reason === 'retired out';
+      const targetBatterName = event.batterName || item.batters.find((b) => b.onStrike)?.name || item.batters[0]?.name;
+      const subBatterName = event.subBatter;
+      const retireIdx = item.batters.findIndex((b) => b.name === targetBatterName);
+      if (retireIdx < 0) return;
+      const wasOnStrike = item.batters[retireIdx].onStrike;
+
+      setUndoHistory((history) => [...history, item]);
+
+      const battingCard = [...(item.battingCard || item.batters.map((b) => ({ ...b, fours: b.fours || 0, sixes: b.sixes || 0 })))];
+      let cardIdx = battingCard.findIndex((b) => b.name === targetBatterName);
+      if (cardIdx < 0) {
+        cardIdx = battingCard.length;
+        battingCard.push({ name: targetBatterName, runs: item.batters[retireIdx].runs, balls: item.batters[retireIdx].balls, fours: 0, sixes: 0, dismissed: false });
+      }
+      battingCard[cardIdx] = {
+        ...battingCard[cardIdx],
+        dismissed: isOut,
+        howOut: reason,
+      };
+
+      let batters = [...item.batters];
+      let pendingBatterSelection = false;
+      let pendingBatterIndex = null;
+      let pendingBatterOnStrike = null;
+
+      if (subBatterName) {
+        batters[retireIdx] = {
+          name: subBatterName,
+          runs: 0,
+          balls: 0,
+          fours: 0,
+          sixes: 0,
+          onStrike: wasOnStrike,
+        };
+        if (!battingCard.some((b) => b.name === subBatterName)) {
+          battingCard.push({
+            name: subBatterName,
+            runs: 0,
+            balls: 0,
+            fours: 0,
+            sixes: 0,
+            dismissed: false,
+          });
+        }
+      } else {
+        pendingBatterSelection = true;
+        pendingBatterIndex = retireIdx;
+        pendingBatterOnStrike = wasOnStrike;
+      }
+
+      const finalWickets = item.wickets + (isOut ? 1 : 0);
+      const squadCount = item.battingPlayers?.length || (item.batters?.length ? item.batters.length + 1 : 11);
+      const allOut = Boolean(isOut && finalWickets >= squadCount - 1);
+      const inningComplete = allOut;
+      const inningsBreak = Boolean(inningComplete && (item.inningsNumber || 1) === 1);
+      const targetReached = Boolean((item.inningsNumber || 1) === 2 && item.target && item.score >= item.target);
+      const matchComplete = Boolean((item.inningsNumber || 1) === 2 && (targetReached || inningComplete));
+
+      const overHistory = [...(item.overHistory || [])];
+      if (overHistory.length > 0) {
+        const lastIdx = overHistory.length - 1;
+        const lastOver = overHistory[lastIdx];
+        if (!lastOver.complete) {
+          overHistory[lastIdx] = {
+            ...lastOver,
+            wickets: lastOver.wickets + (isOut ? 1 : 0),
+            balls: [
+              ...lastOver.balls,
+              {
+                label: isOut ? 'Ret.Out' : 'Ret.Hurt',
+                runs: 0,
+                legal: false,
+                wicket: isOut,
+                howOut: reason,
+                dismissedBatter: targetBatterName,
+              },
+            ],
+          };
+        }
+      }
+
+      const dismissedPlayers = isOut
+        ? [...new Set([...(item.dismissedPlayers || []), targetBatterName])]
+        : (item.dismissedPlayers || []);
+
+      const result = inningsBreak
+        ? 'First innings complete'
+        : matchComplete
+        ? targetReached
+          ? `${item.home.name} won by ${Math.max(1, squadCount - finalWickets - 1)} wickets`
+          : `${item.away.name} won by ${Math.max(0, item.target - 1 - item.score)} runs`
+        : item.result;
+
+      const firstInnings = inningsBreak
+        ? { team: item.home.name, score: item.score, wickets: finalWickets, overs: item.overs, totalOvers: item.totalOvers, batters, battingCard, overHistory, bowlingStats: item.bowlingStats, bowler: { ...item.bowler } }
+        : item.firstInnings;
+
+      const next = {
+        ...item,
+        status: inningsBreak ? 'INNINGS_BREAK' : matchComplete ? 'AWAITING_END' : item.status,
+        result,
+        target: inningsBreak ? item.score + 1 : item.target,
+        firstInnings,
+        wickets: finalWickets,
+        batters,
+        battingCard,
+        dismissedPlayers,
+        pendingBatterSelection: !matchComplete && !inningsBreak && pendingBatterSelection,
+        pendingBatterIndex,
+        pendingBatterOnStrike,
+        overHistory,
+      };
+
+      if (matchComplete) {
+        const potmCalc = calculatePlayerOfMatch(next);
+        if (potmCalc?.bestPlayer) {
+          next.playerOfMatch = potmCalc.bestPlayer.name;
+          next.potmSummary = potmCalc.bestPlayer.summary;
+          next.potmPoints = potmCalc.bestPlayer.points;
+        }
+      }
+
+      setSelectedMatch(next);
+      setScoreMatches((all) => all.map((entry) => entry.id === item.id ? next : entry));
+      setToast(`${targetBatterName} ${isOut ? 'retired out (+1 wkt)' : 'retired hurt (not out)'}`);
+      setTimeout(() => setToast(''), 2200);
+      return;
+    }
     const isWicket = event === 'Wicket' || (typeof event === 'object' && event?.type === 'Wicket');
     const out = isWicket;
     const isNoBall = event === 'No ball' || (typeof event === 'object' && event?.type === 'No ball');
@@ -178,15 +317,25 @@ function AppContent() {
 
     let runs = 0;
     let batterRuns = 0;
+    let shotDirection = null;
     if (typeof event === 'number') {
       runs = event;
       batterRuns = event;
+    } else if (typeof event === 'object' && event?.type === 'Run') {
+      runs = event.runs ?? 0;
+      batterRuns = event.runs ?? 0;
+      shotDirection = event.shotDirection || null;
+    } else if (typeof event === 'object' && event?.runs !== undefined && !isNoBall && !isWicket) {
+      runs = event.runs ?? 0;
+      batterRuns = event.runs ?? 0;
+      shotDirection = event.shotDirection || null;
     } else if (isWide) {
       runs = 1;
       batterRuns = 0;
     } else if (isNoBall) {
       runs = noBallPenalty + batRuns;
       batterRuns = batRuns;
+      shotDirection = event?.shotDirection || null;
     }
 
     const ballLabel = out
@@ -197,6 +346,8 @@ function AppContent() {
       ? (batRuns > 0 ? `Nb+${batRuns}` : 'Nb')
       : typeof event === 'number'
       ? `${event}`
+      : typeof event === 'object' && event?.runs !== undefined
+      ? `${event.runs}`
       : '0';
 
     const dismissalType = (typeof event === 'object' && event?.dismissalType) || 'Bowled';
@@ -273,13 +424,50 @@ function AppContent() {
     } else {
       let cardIndex = battingCard.findIndex((batter) => batter.name === batters[strikerIndex].name);
       if (cardIndex < 0) { cardIndex = battingCard.length; battingCard.push({ name: batters[strikerIndex].name, runs: 0, balls: 0, fours: 0, sixes: 0, dismissed: false }); }
-      battingCard[cardIndex] = { ...battingCard[cardIndex], runs: (battingCard[cardIndex].runs || 0) + batterRuns, balls: (battingCard[cardIndex].balls || 0) + (ballFaced ? 1 : 0), fours: (battingCard[cardIndex].fours || 0) + (batterRuns === 4 ? 1 : 0), sixes: (battingCard[cardIndex].sixes || 0) + (batterRuns === 6 ? 1 : 0), dismissed: battingCard[cardIndex].dismissed };
+      
+      const prevRuns = batters[strikerIndex].runs || 0;
+      const nextRuns = prevRuns + batterRuns;
+      const prevBalls = batters[strikerIndex].balls || 0;
+      const nextBalls = prevBalls + (ballFaced ? 1 : 0);
+      const strikerName = batters[strikerIndex].name;
+
+      if (prevRuns < 50 && nextRuns >= 50) {
+        setMilestoneCelebration({
+          type: 'FIFTY',
+          title: '🌟 HALF CENTURY! 🌟',
+          message: `${strikerName} brings up a sparkling 50 off ${nextBalls} balls!`,
+          player: strikerName,
+        });
+      } else if (prevRuns < 100 && nextRuns >= 100) {
+        setMilestoneCelebration({
+          type: 'CENTURY',
+          title: '👑 CENTURY! 👑',
+          message: `${strikerName} scores a sensational 100 off ${nextBalls} balls!`,
+          player: strikerName,
+        });
+      }
+
+      const currentShots = { ...(battingCard[cardIndex].shots || { 'Off side': 0, 'Straight': 0, 'Leg side': 0, 'Behind': 0 }) };
+      if (shotDirection && currentShots[shotDirection] !== undefined) {
+        currentShots[shotDirection] = (currentShots[shotDirection] || 0) + 1;
+      }
+
+      battingCard[cardIndex] = {
+        ...battingCard[cardIndex],
+        runs: (battingCard[cardIndex].runs || 0) + batterRuns,
+        balls: (battingCard[cardIndex].balls || 0) + (ballFaced ? 1 : 0),
+        fours: (battingCard[cardIndex].fours || 0) + (batterRuns === 4 ? 1 : 0),
+        sixes: (battingCard[cardIndex].sixes || 0) + (batterRuns === 6 ? 1 : 0),
+        dismissed: battingCard[cardIndex].dismissed,
+        shots: currentShots,
+      };
       batters[strikerIndex] = {
         ...batters[strikerIndex],
-        runs: batters[strikerIndex].runs + batterRuns,
-        balls: batters[strikerIndex].balls + (ballFaced ? 1 : 0),
+        runs: nextRuns,
+        balls: nextBalls,
         fours: (batters[strikerIndex].fours || 0) + (batterRuns === 4 ? 1 : 0),
         sixes: (batters[strikerIndex].sixes || 0) + (batterRuns === 6 ? 1 : 0),
+        shots: currentShots,
       };
     }
     const strikeRuns = batterRuns;
@@ -297,7 +485,46 @@ function AppContent() {
     const bowlerBalls = (oldBowler.legalBalls ?? oldBowlerOvers * 6 + oldBowlerBallsInOver) + (legalDelivery ? 1 : 0);
     const bowlerRuns = runs;
     const bowlerGetsWicket = out && dismissalType !== 'Run out';
-    const bowlingStats = { ...(item.bowlingStats || {}), [oldBowler.name]: { runs: oldBowler.runs + bowlerRuns, wickets: oldBowler.wickets + (bowlerGetsWicket ? 1 : 0), legalBalls: bowlerBalls } };
+    const prevBowlerWickets = oldBowler.wickets || 0;
+    const nextBowlerWickets = prevBowlerWickets + (bowlerGetsWicket ? 1 : 0);
+
+    if (bowlerGetsWicket) {
+      const lastDeliveries = [];
+      for (let i = (item.overHistory || []).length - 1; i >= 0 && lastDeliveries.length < 2; i--) {
+        const ov = item.overHistory[i];
+        if (ov.bowler === currentBowlerName) {
+          for (let j = (ov.balls || []).length - 1; j >= 0 && lastDeliveries.length < 2; j--) {
+            const b = ov.balls[j];
+            if (b.legal) lastDeliveries.push(b);
+          }
+        }
+      }
+      const isHatTrick = lastDeliveries.length === 2 && lastDeliveries[0].wicket && lastDeliveries[1].wicket;
+      if (isHatTrick) {
+        setMilestoneCelebration({
+          type: 'HAT_TRICK',
+          title: '🎩 HAT-TRICK! 🎩',
+          message: `${currentBowlerName} takes 3 wickets in 3 balls! Outstanding bowling!`,
+          player: currentBowlerName,
+        });
+      } else if (prevBowlerWickets < 3 && nextBowlerWickets === 3) {
+        setMilestoneCelebration({
+          type: '3W',
+          title: '🔥 3-WICKET HAUL! 🔥',
+          message: `${currentBowlerName} bags their 3rd wicket!`,
+          player: currentBowlerName,
+        });
+      } else if (prevBowlerWickets < 5 && nextBowlerWickets === 5) {
+        setMilestoneCelebration({
+          type: '5W',
+          title: '💥 5-WICKET HAUL! 💥',
+          message: `${currentBowlerName} completes a 5-wicket haul! Brilliant performance!`,
+          player: currentBowlerName,
+        });
+      }
+    }
+
+    const bowlingStats = { ...(item.bowlingStats || {}), [oldBowler.name]: { runs: oldBowler.runs + bowlerRuns, wickets: nextBowlerWickets, legalBalls: bowlerBalls } };
     const overNumber = completedOvers + 1;
     const overHistory = [...(item.overHistory || [])];
     let currentOverIndex = overHistory.findIndex((over) => over.over === overNumber);
@@ -306,7 +533,7 @@ function AppContent() {
       overHistory.push({ over: overNumber, runs: 0, wickets: 0, balls: [], bowler: oldBowler.name, complete: false });
     }
     const currentOver = overHistory[currentOverIndex];
-    overHistory[currentOverIndex] = { ...currentOver, runs: currentOver.runs + runs, wickets: currentOver.wickets + (out ? 1 : 0), balls: [...currentOver.balls, { label: ballLabel, runs, legal: legalDelivery, wicket: out, howOut: out ? howOut : null, dismissalType: out ? dismissalType : null, dismissedBatter: dismissedName }], bowler: oldBowler.name, complete: overComplete };
+    overHistory[currentOverIndex] = { ...currentOver, runs: currentOver.runs + runs, wickets: currentOver.wickets + (out ? 1 : 0), balls: [...currentOver.balls, { label: ballLabel, runs, legal: legalDelivery, wicket: out, howOut: out ? howOut : null, dismissalType: out ? dismissalType : null, dismissedBatter: dismissedName, shotDirection: shotDirection || null, striker: batters[strikerIndex]?.name || null }], bowler: oldBowler.name, complete: overComplete };
     const nextBowlerName = oldBowler.name;
     const bowlerStats = bowlingStats[nextBowlerName] || { runs: 0, wickets: 0, legalBalls: 0 };
     const nextBatterIndex = item.nextBatterIndex ?? 2;
@@ -426,7 +653,44 @@ function AppContent() {
   return <SafeAreaView className="flex-1" style={{ width: '100%', alignSelf: 'stretch', backgroundColor: mode === 'dark' ? '#111814' : '#F8F9F6' }}><StatusBar barStyle="dark-content" backgroundColor={mode === 'dark' ? '#111814' : '#F8F9F6'} />
     {!selectedMatch ? <><View style={{ height: 57, paddingHorizontal: 21, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}><View style={{ flexDirection: 'row', alignItems: 'center' }}><View style={{ height: 31, width: 31, borderRadius: 11, backgroundColor: '#187B62', alignItems: 'center', justifyContent: 'center', marginRight: 9 }}><Ionicons name="radio-button-on" size={17} color="white" /></View><Text style={{ color: '#18362B', fontSize: 20, fontWeight: '900', letterSpacing: -.7 }}>pitch<Text style={{ color: '#187B62' }}>.</Text></Text></View><Pressable onPress={() => setTab('Profile')} style={{ width: 36, height: 36, borderRadius: 14, backgroundColor: '#E8F0EA', alignItems: 'center', justifyContent: 'center' }}><Text style={{ color: '#187B62', fontSize: 11, fontWeight: '800' }}>RP</Text><View style={{ position: 'absolute', right: -1, top: -1, width: 9, height: 9, backgroundColor: '#D96B50', borderRadius: 5, borderWidth: 1.5, borderColor: '#F8F9F6' }} /></Pressable></View>
       <View style={{ flex: 1 }}>{tab === 'Home' ? <Dashboard matches={scoreMatches} onOpenMatch={openMatch} onCreateMatch={() => setCreateVisible(true)} onLiveScore={openLiveScore} onNavigate={goTab} /> : tab === 'Matches' ? <Matches matches={scoreMatches} onOpenMatch={openMatch} onCreateMatch={() => setCreateVisible(true)} /> : tab === 'Teams' ? <Teams players={allPlayers} matches={scoreMatches} onAddPlayer={handleAddPlayer} onEditPlayer={handleEditPlayer} onDeletePlayer={handleDeletePlayer} /> : <Profile mode={mode} onToggleTheme={toggleMode} onSignOut={() => setSignedIn(false)} />}</View>
-      <View style={{ flexDirection: 'row', backgroundColor: 'white', paddingTop: 8, paddingBottom: 5, borderTopWidth: 1, borderTopColor: '#ECEFEC' }}>{tabs.map((item) => { const active = tab === item.name; return <Pressable onPress={() => goTab(item.name)} key={item.name} style={{ flex: 1, alignItems: 'center', paddingVertical: 3 }}><Ionicons name={active ? item.active : item.icon} size={20} color={active ? '#187B62' : '#909B93'} /><Text style={{ color: active ? '#187B62' : '#909B93', fontSize: 9, fontWeight: active ? '800' : '600', marginTop: 3 }}>{item.name}</Text>{active && <View style={{ width: 4, height: 4, borderRadius: 3, backgroundColor: '#187B62', marginTop: 3 }} />}</Pressable>; })}</View></> : <View style={{ flex: 1 }}>{selectedMatch.status === 'COMPLETED' || selectedMatch.status === 'UPCOMING' ? <MatchScorecard match={selectedMatch} onBack={() => setSelectedMatch(null)} /> : <LiveMatch match={selectedMatch} onBack={() => setSelectedMatch(null)} onUpdate={updateScore} onSelectBatter={selectNextBatter} onSelectBowler={selectNextBowler} onStartSecondInnings={startSecondInnings} onEndMatch={endMatch} />}</View>}
+      <View style={{ flexDirection: 'row', backgroundColor: 'white', paddingTop: 8, paddingBottom: 5, borderTopWidth: 1, borderTopColor: '#ECEFEC' }}>{tabs.map((item) => { const active = tab === item.name; return <Pressable onPress={() => goTab(item.name)} key={item.name} style={{ flex: 1, alignItems: 'center', paddingVertical: 3 }}><Ionicons name={active ? item.active : item.icon} size={20} color={active ? '#187B62' : '#909B93'} /><Text style={{ color: active ? '#187B62' : '#909B93', fontSize: 9, fontWeight: active ? '800' : '600', marginTop: 3 }}>{item.name}</Text>{active && <View style={{ width: 4, height: 4, borderRadius: 3, backgroundColor: '#187B62', marginTop: 3 }} />}</Pressable>; })}</View></> : <View style={{ flex: 1 }}>{selectedMatch.status === 'COMPLETED' || selectedMatch.status === 'UPCOMING' ? <MatchScorecard match={selectedMatch} onBack={() => setSelectedMatch(null)} /> : <LiveMatch match={selectedMatch} onBack={() => setSelectedMatch(null)} onUpdate={updateScore} onSelectBatter={selectNextBatter} onSelectBowler={selectNextBowler} onStartSecondInnings={startSecondInnings} onEndMatch={endMatch} milestoneCelebration={milestoneCelebration} onDismissMilestone={() => setMilestoneCelebration(null)} />}</View>}
+    {milestoneCelebration ? (
+      <Pressable
+        onPress={() => setMilestoneCelebration(null)}
+        style={{
+          position: 'absolute',
+          top: 50,
+          left: 18,
+          right: 18,
+          zIndex: 999,
+          backgroundColor: '#103C2E',
+          borderRadius: 18,
+          padding: 15,
+          borderWidth: 2,
+          borderColor: '#F5BE47',
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: 5 },
+          shadowOpacity: 0.35,
+          shadowRadius: 8,
+          elevation: 10,
+          flexDirection: 'row',
+          alignItems: 'center',
+        }}
+      >
+        <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: '#F5BE4725', alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
+          <Ionicons name="sparkles" size={22} color="#F5BE47" />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={{ color: '#F5BE47', fontSize: 13, fontWeight: '900', letterSpacing: 0.7 }}>
+            {milestoneCelebration.title}
+          </Text>
+          <Text style={{ color: 'white', fontSize: 12, fontWeight: '600', marginTop: 2 }}>
+            {milestoneCelebration.message}
+          </Text>
+        </View>
+        <Ionicons name="close" size={18} color="#A9C3B8" />
+      </Pressable>
+    ) : null}
     {toast ? <View style={{ position: 'absolute', bottom: 90, alignSelf: 'center', backgroundColor: '#24352C', paddingHorizontal: 17, paddingVertical: 11, borderRadius: 20 }}><Text style={{ color: 'white', fontSize: 12, fontWeight: '700' }}>{toast}</Text></View> : null}
   </SafeAreaView>;
 }

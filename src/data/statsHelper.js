@@ -395,3 +395,129 @@ export function computePlayerCareerStats(player, matches = []) {
     recentPerformances,
   };
 }
+
+export function calculateShotBreakdown(match, batterName = null) {
+  const counts = { 'Off side': 0, 'Straight': 0, 'Leg side': 0, 'Behind': 0 };
+  if (!match) return { counts, total: 0 };
+
+  const allOvers = [
+    ...(match.firstInnings?.overHistory || []),
+    ...(match.overHistory || []),
+  ];
+  let total = 0;
+  allOvers.forEach((over) => {
+    (over.balls || []).forEach((ball) => {
+      if (ball.shotDirection && counts[ball.shotDirection] !== undefined) {
+        if (!batterName || ball.batter === batterName || ball.striker === batterName) {
+          counts[ball.shotDirection] += 1;
+          total += 1;
+        }
+      }
+    });
+  });
+
+  // Also check battingCard shots if available
+  if (total === 0) {
+    const allCards = [
+      ...(match.firstInnings?.battingCard || []),
+      ...(match.battingCard || []),
+    ];
+    allCards.forEach((c) => {
+      if ((!batterName || c.name === batterName) && c.shots) {
+        Object.entries(c.shots).forEach(([dir, count]) => {
+          if (counts[dir] !== undefined) {
+            counts[dir] += count;
+            total += count;
+          }
+        });
+      }
+    });
+  }
+
+  return { counts, total };
+}
+
+export function generateWhatsAppSummary(match) {
+  if (!match) return '';
+
+  const isSecond = match.inningsNumber === 2 && Boolean(match.firstInnings);
+  const team1 = isSecond ? (match.firstInnings.team || match.away?.name || 'Team 1') : (match.home?.name || 'Team 1');
+  const team2 = isSecond ? (match.home?.name || 'Team 2') : (match.away?.name || 'Team 2');
+  const format = match.format || `${match.totalOvers || 20} Ov`;
+  const result = match.result || 'Match in progress';
+  const potm = match.playerOfMatch;
+
+  // 1st innings stats
+  const inn1Score = match.firstInnings ? `${match.firstInnings.score}/${match.firstInnings.wickets}` : `${match.score}/${match.wickets}`;
+  const inn1Overs = match.firstInnings ? match.firstInnings.overs : match.overs;
+
+  // 2nd innings stats
+  const has2nd = isSecond;
+  const inn2Score = has2nd ? `${match.score}/${match.wickets}` : '';
+  const inn2Overs = has2nd ? match.overs : '';
+
+  // Extract top performers
+  const allBatters = [
+    ...(match.firstInnings?.battingCard || match.firstInnings?.batters || []),
+    ...(match.battingCard || match.batters || []),
+  ].filter((b) => b && ((b.runs || 0) > 0 || (b.balls || 0) > 0))
+   .sort((a, b) => (b.runs || 0) - (a.runs || 0));
+
+  const topBatsmen = allBatters.slice(0, 3);
+
+  const allBowlers = [];
+  const addBowlers = (statsObj) => {
+    if (!statsObj) return;
+    Object.entries(statsObj).forEach(([bName, bData]) => {
+      allBowlers.push({
+        name: bName,
+        wickets: bData.wickets || 0,
+        runs: bData.runs || 0,
+        overs: `${Math.floor((bData.legalBalls || 0) / 6)}.${(bData.legalBalls || 0) % 6}`,
+      });
+    });
+  };
+  addBowlers(match.firstInnings?.bowlingStats);
+  addBowlers(match.bowlingStats);
+  allBowlers.sort((a, b) => b.wickets - a.wickets || a.runs - b.runs);
+  const topBowlers = allBowlers.slice(0, 2);
+
+  let text = `🏏 *PITCH CRICKET MATCH REPORT*\n`;
+  text += `━━━━━━━━━━━━━━━━━━━━━\n`;
+  text += `🏆 *${result.toUpperCase()}*\n`;
+  text += `⚔️ *${team1} vs ${team2}* (${format})\n\n`;
+
+  text += `📊 *SCORECARD SUMMARY:*\n`;
+  text += `• *${team1}:* ${inn1Score} (${inn1Overs} ov)\n`;
+  if (has2nd && inn2Score) {
+    text += `• *${team2}:* ${inn2Score} (${inn2Overs} ov)\n`;
+  }
+  text += `\n`;
+
+  if (topBatsmen.length > 0) {
+    text += `⭐ *TOP BATSMEN:*\n`;
+    topBatsmen.forEach((b) => {
+      const notOut = !b.dismissed ? '*' : '';
+      text += `• ${b.name}: ${b.runs}${notOut} (${b.balls}b, ${b.fours || 0}x4, ${b.sixes || 0}x6)\n`;
+    });
+    text += `\n`;
+  }
+
+  if (topBowlers.length > 0) {
+    text += `🎯 *TOP BOWLERS:*\n`;
+    topBowlers.forEach((b) => {
+      text += `• ${b.name}: ${b.wickets}/${b.runs} (${b.overs} ov)\n`;
+    });
+    text += `\n`;
+  }
+
+  if (potm) {
+    text += `🏅 *PLAYER OF THE MATCH:*\n`;
+    text += `• *${potm}* ${match.potmSummary ? `(${match.potmSummary})` : ''}\n\n`;
+  }
+
+  text += `━━━━━━━━━━━━━━━━━━━━━\n`;
+  text += `📱 Scored live with *Pitch Cricket*`;
+
+  return text;
+}

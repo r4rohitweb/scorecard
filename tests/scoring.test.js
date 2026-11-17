@@ -1,6 +1,6 @@
 const assert = require('assert');
 const { matches: initialMatches, players: initialPlayers } = require('../src/data/mockData');
-const { calculatePlayerOfMatch, computePlayerCareerStats } = require('../src/data/statsHelper');
+const { calculatePlayerOfMatch, computePlayerCareerStats, calculateShotBreakdown, generateWhatsAppSummary } = require('../src/data/statsHelper');
 
 // Engine logic extracted from App.js
 function updateScore(item, event, undoHistory = []) {
@@ -20,6 +20,108 @@ function updateScore(item, event, undoHistory = []) {
     const next = { ...item, noBallRun: event.value };
     return { item: next, undoHistory };
   }
+  if (typeof event === 'object' && event?.type === 'Retire') {
+    const reason = event.reason || 'retired hurt';
+    const isOut = reason === 'retired out';
+    const targetBatterName = event.batterName || item.batters.find((b) => b.onStrike)?.name || item.batters[0]?.name;
+    const subBatterName = event.subBatter;
+    const retireIdx = item.batters.findIndex((b) => b.name === targetBatterName);
+    if (retireIdx < 0) return { item, undoHistory };
+    const wasOnStrike = item.batters[retireIdx].onStrike;
+
+    const battingCard = [...(item.battingCard || item.batters.map((b) => ({ ...b, fours: b.fours || 0, sixes: b.sixes || 0 })))];
+    let cardIdx = battingCard.findIndex((b) => b.name === targetBatterName);
+    if (cardIdx < 0) {
+      cardIdx = battingCard.length;
+      battingCard.push({ name: targetBatterName, runs: item.batters[retireIdx].runs, balls: item.batters[retireIdx].balls, fours: 0, sixes: 0, dismissed: false });
+    }
+    battingCard[cardIdx] = {
+      ...battingCard[cardIdx],
+      dismissed: isOut,
+      howOut: reason,
+    };
+
+    let batters = [...item.batters];
+    let pendingBatterSelection = false;
+    let pendingBatterIndex = null;
+    let pendingBatterOnStrike = null;
+
+    if (subBatterName) {
+      batters[retireIdx] = {
+        name: subBatterName,
+        runs: 0,
+        balls: 0,
+        fours: 0,
+        sixes: 0,
+        onStrike: wasOnStrike,
+      };
+      if (!battingCard.some((b) => b.name === subBatterName)) {
+        battingCard.push({
+          name: subBatterName,
+          runs: 0,
+          balls: 0,
+          fours: 0,
+          sixes: 0,
+          dismissed: false,
+        });
+      }
+    } else {
+      pendingBatterSelection = true;
+      pendingBatterIndex = retireIdx;
+      pendingBatterOnStrike = wasOnStrike;
+    }
+
+    const finalWickets = item.wickets + (isOut ? 1 : 0);
+    const squadCount = item.battingPlayers?.length || (item.batters?.length ? item.batters.length + 1 : 11);
+    const allOut = Boolean(isOut && finalWickets >= squadCount - 1);
+    const inningComplete = allOut;
+    const inningsBreak = Boolean(inningComplete && (item.inningsNumber || 1) === 1);
+    const targetReached = Boolean((item.inningsNumber || 1) === 2 && item.target && item.score >= item.target);
+    const matchComplete = Boolean((item.inningsNumber || 1) === 2 && (targetReached || inningComplete));
+
+    const overHistory = [...(item.overHistory || [])];
+    if (overHistory.length > 0) {
+      const lastIdx = overHistory.length - 1;
+      const lastOver = overHistory[lastIdx];
+      if (!lastOver.complete) {
+        overHistory[lastIdx] = {
+          ...lastOver,
+          wickets: lastOver.wickets + (isOut ? 1 : 0),
+          balls: [
+            ...lastOver.balls,
+            {
+              label: isOut ? 'Ret.Out' : 'Ret.Hurt',
+              runs: 0,
+              legal: false,
+              wicket: isOut,
+              howOut: reason,
+              dismissedBatter: targetBatterName,
+            },
+          ],
+        };
+      }
+    }
+
+    const dismissedPlayers = isOut
+      ? [...new Set([...(item.dismissedPlayers || []), targetBatterName])]
+      : (item.dismissedPlayers || []);
+
+    const next = {
+      ...item,
+      status: inningsBreak ? 'INNINGS_BREAK' : matchComplete ? 'AWAITING_END' : item.status,
+      target: inningsBreak ? item.score + 1 : item.target,
+      wickets: finalWickets,
+      batters,
+      battingCard,
+      dismissedPlayers,
+      pendingBatterSelection: !matchComplete && !inningsBreak && pendingBatterSelection,
+      pendingBatterIndex,
+      pendingBatterOnStrike,
+      overHistory,
+    };
+
+    return { item: next, undoHistory: [...undoHistory, item] };
+  }
   const isWicket = event === 'Wicket' || (typeof event === 'object' && event?.type === 'Wicket');
   const out = isWicket;
   const dismissalType = (typeof event === 'object' && event?.dismissalType) || 'Bowled';
@@ -36,15 +138,25 @@ function updateScore(item, event, undoHistory = []) {
 
   let runs = 0;
   let batterRuns = 0;
+  let shotDirection = null;
   if (typeof event === 'number') {
     runs = event;
     batterRuns = event;
+  } else if (typeof event === 'object' && event?.type === 'Run') {
+    runs = event.runs ?? 0;
+    batterRuns = event.runs ?? 0;
+    shotDirection = event.shotDirection || null;
+  } else if (typeof event === 'object' && event?.runs !== undefined && !isNoBall && !isWicket) {
+    runs = event.runs ?? 0;
+    batterRuns = event.runs ?? 0;
+    shotDirection = event.shotDirection || null;
   } else if (isWide) {
     runs = 1;
     batterRuns = 0;
   } else if (isNoBall) {
     runs = noBallPenalty + batRuns;
     batterRuns = batRuns;
+    shotDirection = event?.shotDirection || null;
   }
 
   const ballLabel = out
@@ -55,6 +167,8 @@ function updateScore(item, event, undoHistory = []) {
     ? (batRuns > 0 ? `Nb+${batRuns}` : 'Nb')
     : typeof event === 'number'
     ? `${event}`
+    : typeof event === 'object' && event?.runs !== undefined
+    ? `${event.runs}`
     : '0';
   const [completedOvers, ballsInOver] = item.overs.split('.').map(Number);
   const totalBalls = completedOvers * 6 + ballsInOver + (legalDelivery ? 1 : 0);
@@ -126,13 +240,18 @@ function updateScore(item, event, undoHistory = []) {
   } else {
     let cardIndex = battingCard.findIndex((batter) => batter.name === batters[strikerIndex].name);
     if (cardIndex < 0) { cardIndex = battingCard.length; battingCard.push({ name: batters[strikerIndex].name, runs: 0, balls: 0, fours: 0, sixes: 0, dismissed: false }); }
-    battingCard[cardIndex] = { ...battingCard[cardIndex], runs: (battingCard[cardIndex].runs || 0) + batterRuns, balls: (battingCard[cardIndex].balls || 0) + (ballFaced ? 1 : 0), fours: (battingCard[cardIndex].fours || 0) + (batterRuns === 4 ? 1 : 0), sixes: (battingCard[cardIndex].sixes || 0) + (batterRuns === 6 ? 1 : 0), dismissed: battingCard[cardIndex].dismissed };
+    const currentShots = { ...(battingCard[cardIndex].shots || { 'Off side': 0, 'Straight': 0, 'Leg side': 0, 'Behind': 0 }) };
+    if (shotDirection && currentShots[shotDirection] !== undefined) {
+      currentShots[shotDirection] = (currentShots[shotDirection] || 0) + 1;
+    }
+    battingCard[cardIndex] = { ...battingCard[cardIndex], runs: (battingCard[cardIndex].runs || 0) + batterRuns, balls: (battingCard[cardIndex].balls || 0) + (ballFaced ? 1 : 0), fours: (battingCard[cardIndex].fours || 0) + (batterRuns === 4 ? 1 : 0), sixes: (battingCard[cardIndex].sixes || 0) + (batterRuns === 6 ? 1 : 0), dismissed: battingCard[cardIndex].dismissed, shots: currentShots };
     batters[strikerIndex] = {
       ...batters[strikerIndex],
       runs: batters[strikerIndex].runs + batterRuns,
       balls: batters[strikerIndex].balls + (ballFaced ? 1 : 0),
       fours: (batters[strikerIndex].fours || 0) + (batterRuns === 4 ? 1 : 0),
       sixes: (batters[strikerIndex].sixes || 0) + (batterRuns === 6 ? 1 : 0),
+      shots: currentShots,
     };
   }
   const strikeRuns = batterRuns;
@@ -159,7 +278,7 @@ function updateScore(item, event, undoHistory = []) {
     overHistory.push({ over: overNumber, runs: 0, wickets: 0, balls: [], bowler: oldBowler.name, complete: false });
   }
   const currentOver = overHistory[currentOverIndex];
-  overHistory[currentOverIndex] = { ...currentOver, runs: currentOver.runs + runs, wickets: currentOver.wickets + (out ? 1 : 0), balls: [...currentOver.balls, { label: ballLabel, runs, legal: legalDelivery, wicket: out, howOut: out ? howOut : null, dismissalType: out ? dismissalType : null, dismissedBatter: dismissedName }], bowler: oldBowler.name, complete: overComplete };
+  overHistory[currentOverIndex] = { ...currentOver, runs: currentOver.runs + runs, wickets: currentOver.wickets + (out ? 1 : 0), balls: [...currentOver.balls, { label: ballLabel, runs, legal: legalDelivery, wicket: out, howOut: out ? howOut : null, dismissalType: out ? dismissalType : null, dismissedBatter: dismissedName, shotDirection: shotDirection || null, striker: batters[strikerIndex]?.name || null }], bowler: oldBowler.name, complete: overComplete };
   const nextBowlerName = oldBowler.name;
   const bowlerStats = bowlingStats[nextBowlerName] || { runs: 0, wickets: 0, legalBalls: 0 };
   const nextBatterIndex = item.nextBatterIndex ?? 2;
@@ -726,6 +845,178 @@ it('TEST 19: Over completion always rotates strike and manual swapStrike toggle 
   const resManual = updateScore(resOver.item, 'swapStrike');
   const manualStriker = resManual.item.batters.find(b => b.onStrike).name;
   assert.strictEqual(manualStriker, 'Rohit', 'swapStrike manually rotates strike back to Rohit');
+});
+
+it('TEST 20: Retire Hurt keeps team wickets unchanged, marks batter retired hurt & not out', () => {
+  let match = {
+    status: 'LIVE', overs: '3.2', score: 32, wickets: 1, totalOvers: 10,
+    batters: [
+      { name: 'Rohit', runs: 24, balls: 14, fours: 3, sixes: 1, onStrike: true },
+      { name: 'Virat', runs: 8, balls: 6, fours: 1, sixes: 0, onStrike: false },
+    ],
+    battingCard: [
+      { name: 'Rohit', runs: 24, balls: 14, fours: 3, sixes: 1, dismissed: false },
+      { name: 'Virat', runs: 8, balls: 6, fours: 1, sixes: 0, dismissed: false },
+    ],
+    battingPlayers: ['Rohit', 'Virat', 'Suryakumar', 'Hardik'],
+    bowlingPlayers: ['Starc'],
+    bowler: { name: 'Starc', overs: '1.2', runs: 12, wickets: 1, legalBalls: 8 },
+    overHistory: [{ over: 4, runs: 2, wickets: 0, balls: [], bowler: 'Starc', complete: false }],
+  };
+
+  const res = updateScore(match, {
+    type: 'Retire',
+    reason: 'retired hurt',
+    batterName: 'Rohit',
+    subBatter: 'Suryakumar',
+  });
+
+  // Wickets should remain 1 (no wicket penalty)
+  assert.strictEqual(res.item.wickets, 1, 'Team wickets must NOT increment on Retired Hurt');
+  // Rohit should be marked retired hurt and NOT dismissed
+  const rohitCard = res.item.battingCard.find((b) => b.name === 'Rohit');
+  assert.strictEqual(rohitCard.howOut, 'retired hurt', 'howOut must be retired hurt');
+  assert.strictEqual(rohitCard.dismissed, false, 'dismissed must be false for retired hurt');
+
+  // Suryakumar should now be in batters and on strike
+  const striker = res.item.batters.find((b) => b.onStrike);
+  assert.strictEqual(striker.name, 'Suryakumar', 'Replacement batter Suryakumar must take strike');
+});
+
+it('TEST 21: Retire Out adds +1 wicket to team wickets, marks batter retired out & dismissed', () => {
+  let match = {
+    status: 'LIVE', overs: '4.0', score: 45, wickets: 1, totalOvers: 10,
+    batters: [
+      { name: 'KL Rahul', runs: 15, balls: 18, fours: 1, sixes: 0, onStrike: false },
+      { name: 'Pant', runs: 30, balls: 16, fours: 2, sixes: 2, onStrike: true },
+    ],
+    battingCard: [
+      { name: 'KL Rahul', runs: 15, balls: 18, fours: 1, sixes: 0, dismissed: false },
+      { name: 'Pant', runs: 30, balls: 16, fours: 2, sixes: 2, dismissed: false },
+    ],
+    battingPlayers: ['KL Rahul', 'Pant', 'Hardik'],
+    bowlingPlayers: ['Cummins'],
+    bowler: { name: 'Cummins', overs: '2.0', runs: 18, wickets: 1, legalBalls: 12 },
+    overHistory: [{ over: 4, runs: 6, wickets: 0, balls: [], bowler: 'Cummins', complete: false }],
+  };
+
+  const res = updateScore(match, {
+    type: 'Retire',
+    reason: 'retired out',
+    batterName: 'KL Rahul',
+    subBatter: 'Hardik',
+  });
+
+  // Wickets should increment by 1
+  assert.strictEqual(res.item.wickets, 2, 'Team wickets must increment by 1 on Retired Out');
+  // Bowler Cummins wicket count should remain 1 (no bowler credit)
+  assert.strictEqual(res.item.bowler.wickets, 1, 'Bowler must NOT receive wicket credit for Retired Out');
+  // KL Rahul must be dismissed
+  const rahulCard = res.item.battingCard.find((b) => b.name === 'KL Rahul');
+  assert.strictEqual(rahulCard.howOut, 'retired out', 'howOut must be retired out');
+  assert.strictEqual(rahulCard.dismissed, true, 'dismissed must be true for retired out');
+});
+
+it('TEST 22: Boundary shot direction tagging attaches shotDirection to overHistory and aggregates shots', () => {
+  let match = {
+    status: 'LIVE', overs: '1.0', score: 10, wickets: 0, totalOvers: 5,
+    batters: [
+      { name: 'Rohit', runs: 10, balls: 6, fours: 2, sixes: 0, onStrike: true },
+      { name: 'Gill', runs: 0, balls: 0, fours: 0, sixes: 0, onStrike: false },
+    ],
+    battingCard: [
+      { name: 'Rohit', runs: 10, balls: 6, fours: 2, sixes: 0, dismissed: false },
+      { name: 'Gill', runs: 0, balls: 0, fours: 0, sixes: 0, dismissed: false },
+    ],
+    battingPlayers: ['Rohit', 'Gill'],
+    bowlingPlayers: ['Shaheen'],
+    bowler: { name: 'Shaheen', overs: '1.0', runs: 10, wickets: 0, legalBalls: 6 },
+    overHistory: [],
+  };
+
+  // Ball 1 of Over 2: Rohit hits 4 towards Off side
+  const res = updateScore(match, { type: 'Run', runs: 4, shotDirection: 'Off side' });
+  const over2 = res.item.overHistory.find((o) => o.over === 2);
+  assert.ok(over2, 'Over 2 must be recorded');
+  const ball = over2.balls[0];
+  assert.strictEqual(ball.shotDirection, 'Off side', 'Ball must record shotDirection as Off side');
+  assert.strictEqual(ball.runs, 4, 'Ball runs must be 4');
+
+  // Check batter shots aggregation
+  const rohitCard = res.item.battingCard.find((b) => b.name === 'Rohit');
+  assert.strictEqual(rohitCard.shots['Off side'], 1, 'Rohit must have 1 shot recorded to Off side');
+});
+
+it('TEST 23: Wagon Wheel shot breakdown helper calculates direction percentages and counts', () => {
+  const match = {
+    firstInnings: {
+      overHistory: [
+        {
+          over: 1,
+          balls: [
+            { runs: 4, shotDirection: 'Off side', batter: 'Rohit' },
+            { runs: 6, shotDirection: 'Straight', batter: 'Rohit' },
+          ],
+        },
+      ],
+    },
+    overHistory: [
+      {
+        over: 1,
+        balls: [
+          { runs: 4, shotDirection: 'Leg side', batter: 'Virat' },
+          { runs: 4, shotDirection: 'Off side', batter: 'Virat' },
+        ],
+      },
+    ],
+  };
+
+  const breakdown = calculateShotBreakdown(match);
+  assert.strictEqual(breakdown.total, 4, 'Total tagged shots should be 4');
+  assert.strictEqual(breakdown.counts['Off side'], 2, 'Off side should have 2 shots');
+  assert.strictEqual(breakdown.counts['Straight'], 1, 'Straight should have 1 shot');
+  assert.strictEqual(breakdown.counts['Leg side'], 1, 'Leg side should have 1 shot');
+  assert.strictEqual(breakdown.counts['Behind'], 0, 'Behind should have 0 shots');
+});
+
+it('TEST 24: WhatsApp Match Summary Generator formats scores, top performers, PotM, and result', () => {
+  const match = {
+    home: { name: 'Mumbai Stars' },
+    away: { name: 'Delhi Royals' },
+    score: 165,
+    wickets: 4,
+    overs: '19.2',
+    target: 162,
+    result: 'Mumbai Stars won by 6 wickets',
+    playerOfMatch: 'Rohit Sharma',
+    potmSummary: '72 (38b) & 1 catch',
+    firstInnings: {
+      team: 'Delhi Royals',
+      score: 161,
+      wickets: 7,
+      overs: '20.0',
+      battingCard: [
+        { name: 'Rishabh Pant', runs: 58, balls: 34, fours: 5, sixes: 3, dismissed: true },
+      ],
+      bowlingStats: {
+        'Jasprit Bumrah': { runs: 24, wickets: 3, legalBalls: 24 },
+      },
+    },
+    battingCard: [
+      { name: 'Rohit Sharma', runs: 72, balls: 38, fours: 7, sixes: 4, dismissed: false },
+    ],
+    bowlingStats: {
+      'Anrich Nortje': { runs: 38, wickets: 2, legalBalls: 24 },
+    },
+  };
+
+  const text = generateWhatsAppSummary(match);
+  assert.ok(text.includes('PITCH CRICKET MATCH REPORT'), 'Summary header present');
+  assert.ok(text.includes('MUMBAI STARS WON BY 6 WICKETS'), 'Result present');
+  assert.ok(text.includes('Rohit Sharma: 72*'), 'Top batsman with not-out asterisk present');
+  assert.ok(text.includes('Jasprit Bumrah: 3/24'), 'Top bowler figures present');
+  assert.ok(text.includes('Rohit Sharma'), 'POTM present');
+  assert.ok(text.includes('whatsapp') || text.includes('Pitch Cricket'), 'Footer branding present');
 });
 
 console.log(`\nResults: ${passed} / ${total} tests passed.\n`);

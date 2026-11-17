@@ -3,11 +3,13 @@ import {
   ActivityIndicator as NativeActivityIndicator,
   Alert as NativeAlert,
   KeyboardAvoidingView,
+  Linking,
   Modal,
   Platform,
   Pressable as NativePressable,
   SafeAreaView as NativeSafeAreaView,
   ScrollView as NativeScrollView,
+  Share as NativeShare,
   StatusBar as NativeStatusBar,
   Text as NativeText,
   TextInput as NativeTextInput,
@@ -105,4 +107,29 @@ export const Alert = {
   },
 };
 
-export { KeyboardAvoidingView, Modal, Platform };
+export async function shareToWhatsApp(text) {
+  try {
+    const encoded = encodeURIComponent(text);
+    const url = `whatsapp://send?text=${encoded}`;
+    const webUrl = `https://api.whatsapp.com/send?text=${encoded}`;
+    if (Platform.OS === 'web') {
+      if (typeof window !== 'undefined' && window.open) {
+        window.open(webUrl, '_blank');
+        return true;
+      }
+    }
+    const supported = await Linking.canOpenURL(url).catch(() => false);
+    if (supported) {
+      await Linking.openURL(url);
+    } else {
+      await NativeShare.share({ message: text });
+    }
+    return true;
+  } catch {
+    NativeShare.share({ message: text }).catch(() => {});
+    return false;
+  }
+}
+
+export { KeyboardAvoidingView, Modal, Platform, Linking };
+export const Share = NativeShare;
